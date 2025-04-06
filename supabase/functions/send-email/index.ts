@@ -8,7 +8,7 @@ serve(async (req) => {
 
   try {
     const data = await resend.emails.send({
-      from: 'PharmaConnect <noreply@pharmconnect.com>',
+      from: 'PharmaConnect <noreply@pharmaconnect-dz.com>',
       to: [to],
       subject: subject,
       text: content,
