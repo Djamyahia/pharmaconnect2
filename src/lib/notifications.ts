@@ -35,7 +35,7 @@ function replacePlaceholders(text: string, replacements: Record<string, string>)
 async function sendEmail(to: string, subject: string, content: string) {
   try {
     const response = await fetch(
-      'https://cdrjlcgnnyrwpmewivjn.functions.supabase.co/send-email',
+      'https://cdrjlcgnnyrwpmewivjn.functions.supabase.co/send-email-v2',
       {
         method: 'POST',
         headers: {
