@@ -12,7 +12,7 @@ const registerSchema = z.object({
   password: z.string().min(6, 'Le mot de passe doit contenir au moins 6 caractères'),
   role: z.enum(['pharmacist', 'wholesaler'] as const),
   company_name: z.string().min(1, 'Le nom de l\'entreprise est requis'),
-  registration_number: z.string().min(1, 'Le numéro d\'enregistrement est requis'),
+  registration_number: z.string().optional(),
   address: z.string().min(1, 'L\'adresse est requise'),
   wilaya: z.string().refine((val) => isValidWilaya(val), {
     message: 'Veuillez sélectionner une wilaya valide'
@@ -34,7 +34,6 @@ export function Register() {
     password: '',
     role: 'pharmacist',
     company_name: '',
-    registration_number: '',
     address: '',
     wilaya: '',
     phone: '',
@@ -172,21 +171,7 @@ export function Register() {
           />
         </div>
 
-        <div>
-          <label htmlFor="registration_number" className="block text-sm font-medium text-gray-700">
-            Numéro d'enregistrement
-          </label>
-          <input
-            type="text"
-            name="registration_number"
-            id="registration_number"
-            required
-            value={formData.registration_number}
-            onChange={handleChange}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-          />
-        </div>
-
+        
         <div>
           <label htmlFor="address" className="block text-sm font-medium text-gray-700">
             Adresse
