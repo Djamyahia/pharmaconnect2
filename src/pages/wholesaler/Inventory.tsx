@@ -49,7 +49,6 @@ export function Inventory() {
       fetchInventory();
       fetchAvailableMedications();
       fetchCategories();
-      // Initialize newItem with user's delivery wilayas
       if (user.delivery_wilayas) {
         setNewItem(prev => ({
           ...prev,
@@ -147,10 +146,8 @@ export function Inventory() {
 
       if (error) throw error;
       
-      // Filter out any inventory items with null medications
       const validInventory = (data || []).filter(item => item.medications !== null);
       
-      // If there are uploaded items being processed, merge them with the inventory
       if (uploadedItems.length > 0) {
         setInventory([...validInventory, ...uploadedItems.filter(item => item.isUnmatched)]);
       } else {
@@ -171,7 +168,6 @@ export function Inventory() {
       const item = uploadedItems.find(i => i.id === itemId);
       if (!item) throw new Error("Item introuvable");
   
-      // Insert the item into the database
       const { error: insertError } = await supabase.from('wholesaler_inventory').insert({
         wholesaler_id: user?.id,
         medication_id: medicationId,
@@ -185,15 +181,11 @@ export function Inventory() {
         throw insertError;
       }
   
-      // Update the uploadedItems state to remove the matched item
       setUploadedItems(prev => prev.filter(i => i.id !== itemId));
   
-      // Update the inventory state directly instead of fetching
       setInventory(prev => {
-        // Remove the unmatched item
         const filteredInventory = prev.filter(i => i.id !== itemId);
         
-        // Add the new matched item
         const newItem = {
           id: itemId,
           wholesaler_id: user?.id!,
@@ -218,7 +210,6 @@ export function Inventory() {
     e.preventDefault();
     setError('');
 
-    // Validate form data
     if (!newItem.medication_id) {
       setError('Please select a medication');
       return;
@@ -254,7 +245,7 @@ export function Inventory() {
         medication_id: '',
         quantity: 0,
         price: 0,
-        delivery_wilayas: user?.delivery_wilayas || [], // Reset with user's delivery wilayas
+        delivery_wilayas: user?.delivery_wilayas || [],
       });
       setError('');
       fetchInventory();
@@ -321,7 +312,6 @@ export function Inventory() {
     const normDosage = normalize(row.dosage || '');
     const normLab = normalize(row.laboratory || '');
 
-    // Create comparison strings for each medication
     const medicationStrings = availableMedications.map(m => ({
       medication: m,
       compareString: normalize(`${m.commercial_name} ${m.form} ${m.dosage} ${m.COND || ''} ${m.laboratory || ''}`),
@@ -331,36 +321,31 @@ export function Inventory() {
       lab: normalize(m.laboratory || '')
     }));
 
-    // Calculate similarity scores
     const scoredMedications = medicationStrings.map(m => {
       let score = stringSimilarity.compareTwoStrings(normName, m.nameOnly);
 
-      // Boost score if form matches
       if (normForm && m.form.includes(normForm)) {
         score += 0.2;
       }
 
-      // Boost score if dosage matches
       if (normDosage && m.dosage.includes(normDosage)) {
         score += 0.2;
       }
 
-      // Boost score if laboratory matches
       if (normLab && m.lab === normLab) {
         score += 0.2;
       }
 
       return {
         medication: m.medication,
-        score: Math.min(score, 1) // Cap score at 1
+        score: Math.min(score, 1)
       };
     });
 
-    // Sort by score and return top matches
     return scoredMedications
-      .filter(m => m.score > 0.3) // Only return reasonably good matches
+      .filter(m => m.score > 0.3)
       .sort((a, b) => b.score - a.score)
-      .slice(0, 5) // Limit to top 5 matches
+      .slice(0, 5)
       .map(m => m.medication);
   };
 
@@ -432,7 +417,6 @@ export function Inventory() {
         }
       }
 
-      // Delete previous inventory
       const { error: deleteError } = await supabase
         .from('wholesaler_inventory')
         .delete()
@@ -440,7 +424,6 @@ export function Inventory() {
 
       if (deleteError) throw deleteError;
 
-      // Insert matched medications
       if (itemsToInsert.length > 0) {
         const { error: insertError } = await supabase
           .from('wholesaler_inventory')
@@ -449,10 +432,8 @@ export function Inventory() {
         if (insertError) throw insertError;
       }
 
-      // Store unmatched items in state
       setUploadedItems(newInventory.filter(item => item.isUnmatched));
       
-      // Update the inventory display
       setInventory([
         ...newInventory.filter(item => !item.isUnmatched),
         ...newInventory.filter(item => item.isUnmatched)
@@ -486,7 +467,6 @@ export function Inventory() {
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'Template');
       
-      // Generate and download the file
       XLSX.writeFile(wb, 'inventory_template.xlsx');
     } catch (error) {
       console.error('Error downloading template:', error);
@@ -504,47 +484,50 @@ export function Inventory() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col space-y-4 sm:space-y-0 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-2xl font-semibold text-gray-900">Gestion de l'inventaire</h2>
-        <div className="flex space-x-4">
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={downloadTemplate}
-              className="flex items-center px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+        
+        <div className="flex flex-col space-y-2 sm:flex-row sm:space-y-0 sm:space-x-4">
+          <button
+            onClick={downloadTemplate}
+            className="flex items-center justify-center px-3 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+          >
+            <Download className="h-4 w-4 sm:mr-2" />
+            <span className="inline text-sm ml-2">Télécharger le modèle</span>
+          </button>
+          
+          <div className="relative">
+            <input
+              type="file"
+              onChange={handleFileUpload}
+              accept=".xlsx,.xls"
+              className="hidden"
+              id="file-upload"
+              disabled={uploadLoading}
+            />
+            <label
+              htmlFor="file-upload"
+              className={`flex items-center justify-center px-3 py-2 text-sm bg-indigo-600 text-white rounded-md hover:bg-indigo-700 cursor-pointer ${
+                uploadLoading ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
             >
-              <Download className="h-5 w-5 mr-2" />
-              Télécharger le modèle
-            </button>
-            <div className="relative">
-              <input
-                type="file"
-                onChange={handleFileUpload}
-                accept=".xlsx,.xls"
-                className="hidden"
-                id="file-upload"
-                disabled={uploadLoading}
-              />
-              <label
-                htmlFor="file-upload"
-                className={`flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 cursor-pointer ${
-                  uploadLoading ? 'opacity-50 cursor-not-allowed' : ''
-                }`}
-              >
-                {uploadLoading ? (
-                  <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                ) : (
-                  <Upload className="h-5 w-5 mr-2" />
-                )}
+              {uploadLoading ? (
+                <Loader2 className="h-4 w-4 sm:mr-2 animate-spin" />
+              ) : (
+                <Upload className="h-4 w-4 sm:mr-2" />
+              )}
+              <span className="inline text-sm ml-2">
                 {uploadLoading ? 'Mise à jour...' : 'Importer Excel'}
-              </label>
-            </div>
+              </span>
+            </label>
           </div>
+          
           <button
             onClick={() => setShowAddForm(true)}
-            className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+            className="flex items-center justify-center px-3 py-2 text-sm bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
           >
-            <Plus className="h-5 w-5 mr-2" />
-            Ajouter un produit
+            <Plus className="h-4 w-4 sm:mr-2" />
+            <span className="inline text-sm ml-2">Ajouter un produit</span>
           </button>
         </div>
       </div>
@@ -555,10 +538,8 @@ export function Inventory() {
         </div>
       )}
 
-      {/* Search and Filter Section */}
-      <div className="bg-white shadow rounded-lg p-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Search Input */}
+      <div className="bg-white shadow rounded-lg p-4 sm:p-6">
+        <div className="grid grid-cols-1 gap-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
             <input
@@ -573,132 +554,46 @@ export function Inventory() {
       </div>
 
       <div className="bg-white shadow rounded-lg overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-2/5">
-                Médicament
-              </th>
-              <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-[10%]">
-                Quantité
-              </th>
-              <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-[10%]">
-                Prix
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[25%]">
-                Wilayas de livraison
-              </th>
-              <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[10%]">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {inventory.map((item) => (
-              <tr key={item.id} className={item.isUnmatched ? 'bg-red-50' : 'hover:bg-gray-50'}>
-                <td className="px-6 py-4">
-                  {item.isUnmatched ? (
-                    <>
-                      <div className="text-sm text-red-700 font-semibold mb-1">
-                        {item.originalRow?.commercial_name || 'Nom manquant'}
-                      </div>
-                      <Select
-                        options={(item.suggestions || []).map(med => ({
-                          value: med.id,
-                          label: `${med.commercial_name} - ${med.form} ${med.dosage} (${med.COND || ''})${med.laboratory ? ` | ${med.laboratory}` : ''}`
-                        }))}
-                        onChange={(selected) => selected && handleFixMedication(item.id, selected.value)}
-                        placeholder="Corriger..."
-                        isClearable
-                        styles={{
-                          ...customStyles,
-                          container: (base) => ({
-                            ...base,
-                            width: '100%',
-                            minWidth: '300px'
-                          }),
-                          menu: (base) => ({
-                            ...base,
-                            width: 'max-content',
-                            minWidth: '100%'
-                          }),
-                          menuPortal: base => ({
-                            ...base,
-                            zIndex: 9999
-                          })
-                        }}
-                        menuPortalTarget={document.body}
-                        menuPosition="fixed"
-                      />
-                    </>
-                  ) : (
-                    <>
-                      <div className="text-sm font-medium text-gray-900">
-                        {item.medications?.commercial_name}
-                      </div>
-                      <div className="text-sm text-gray-500">
-                        {item.medications?.form} - {item.medications?.dosage}
-                        {item.medications?.COND && ` (${item.medications.COND})`}
-                      </div>
-                      {item.medications?.laboratory && (
-                        <div className="text-xs text-gray-500">
-                          {item.medications.laboratory}
-                        </div>
-                      )}
-                    </>
-                  )}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right">
-                  {editingItem?.id === item.id ? (
-                    <input
-                      type="number"
-                      min="0"
-                      value={editingItem.quantity}
-                      onChange={(e) => setEditingItem({ ...editingItem, quantity: parseInt(e.target.value) })}
-                      className="w-24 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                    />
-                  ) : (
-                    <span className="text-sm font-medium text-gray-900">{item.quantity} unités</span>
-                  )}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right">
-                  {editingItem?.id === item.id ? (
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={editingItem.price}
-                      onChange={(e) => setEditingItem({ ...editingItem, price: parseFloat(e.target.value) })}
-                      className="w-24 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                    />
-                  ) : (
-                    <div className="space-y-1">
-                      <span className="text-sm font-medium text-gray-900">
-                        {item.price.toFixed(2)} DZD
-                      </span>
-                      {item.has_active_promotion && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                          Promotion active
-                        </span>
-                      )}
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Médicament
+                </th>
+                <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Quantité
+                </th>
+                <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Prix
+                </th>
+                <th scope="col" className="hidden sm:table-cell px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Wilayas
+                </th>
+                <th scope="col" className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {inventory.map((item) => (
+                <tr key={item.id} className={item.isUnmatched ? 'bg-red-50' : 'hover:bg-gray-50'}>
+                  <td className="px-4 py-4">
+                    <div className="text-sm font-medium text-gray-900 break-words">
+                      {item.medications?.commercial_name}
                     </div>
-                  )}
-                </td>
-                <td className="px-6 py-4">
-                  {editingItem?.id === item.id ? (
-                    <Select
-                      isMulti
-                      value={editingItem.delivery_wilayas.map(w => algerianWilayas.find(aw => aw.value === w))}
-                      onChange={(selected) => setEditingItem({ ...editingItem, delivery_wilayas: selected.map(s => s.value) })}
-                      options={algerianWilayas}
-                      className="min-w-[200px]"
-                      styles={customStyles}
-                      components={selectComponents}
-                      menuPortalTarget={document.body}
-                      menuPosition="fixed"
-                    />
-                  ) : (
-                    <div className="text-sm text-gray-900 max-h-20 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+                    <div className="text-sm text-gray-500 break-words">
+                      {item.medications?.form} - {item.medications?.dosage}
+                    </div>
+                  </td>
+                  <td className="px-4 py-4 text-right whitespace-nowrap">
+                    <span className="text-sm text-gray-900">{item.quantity}</span>
+                  </td>
+                  <td className="px-4 py-4 text-right whitespace-nowrap">
+                    <span className="text-sm text-gray-900">{item.price.toFixed(2)} DZD</span>
+                  </td>
+                  <td className="hidden sm:table-cell px-4 py-4">
+                    <div className="text-sm text-gray-900 max-h-20 overflow-y-auto">
                       {item.delivery_wilayas.map((w, i) => (
                         <span key={w} className="inline-block mr-1">
                           {algerianWilayas.find(aw => aw.value === w)?.label}
@@ -706,54 +601,28 @@ export function Inventory() {
                         </span>
                       ))}
                     </div>
-                  )}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  {editingItem?.id === item.id ? (
+                  </td>
+                  <td className="px-4 py-4 text-center">
                     <div className="flex justify-center space-x-2">
                       <button
-                        onClick={() => handleUpdateItem(item.id)}
-                        className="text-green-600 hover:text-green-900"
-                        title="Enregistrer"
-                      >
-                        <Save className="h-5 w-5" />
-                      </button>
-                      <button
-                        onClick={() => setEditingItem(null)}
-                        className="text-gray-600 hover:text-gray-900"
-                        title="Annuler"
-                      >
-                        <X className="h-5 w-5" />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex justify-center space-x-2">
-                      <button
-                        onClick={() => setEditingItem({
-                          id: item.id,
-                          quantity: item.quantity,
-                          price: item.price,
-                          delivery_wilayas: item.delivery_wilayas,
-                        })}
+                        onClick={() => handleEdit(item)}
                         className="text-indigo-600 hover:text-indigo-900"
-                        title="Modifier"
                       >
-                        <Edit2 className="h-5 w-5" />
+                        <Edit2 className="h-4 w-4" />
                       </button>
                       <button
-                        onClick={() => handleDeleteItem(item.id)}
+                        onClick={() => handleDelete(item.id)}
                         className="text-red-600 hover:text-red-900"
-                        title="Supprimer"
                       >
-                        <Trash2 className="h-5 w-5" />
+                        <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
 
         {inventory.length === 0 && (
           <div className="text-center py-12">
@@ -764,7 +633,6 @@ export function Inventory() {
         )}
       </div>
 
-      {/* Add Promotion Form */}
       {showAddForm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full">

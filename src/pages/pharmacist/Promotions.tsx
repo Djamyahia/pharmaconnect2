@@ -230,6 +230,13 @@ export function Promotions() {
     });
   };
 
+  const isPromotionActive = (promotion: ExtendedPromotion) => {
+    const now = new Date();
+    const startDate = new Date(promotion.start_date);
+    const endDate = new Date(promotion.end_date);
+    return now >= startDate && now <= endDate;
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center py-12">
@@ -244,8 +251,8 @@ export function Promotions() {
         <h2 className="text-2xl font-semibold text-gray-900">Promotions actives</h2>
       </div>
 
-      <div className="bg-white shadow rounded-lg p-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="bg-white shadow rounded-lg p-4 sm:p-6">
+        <div className="grid grid-cols-1 gap-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
             <input
@@ -254,19 +261,6 @@ export function Promotions() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10 pr-4 py-2 w-full border rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            />
-          </div>
-
-          <div className="relative">
-            <Select
-              value={algerianWilayas.find(w => w.value === selectedWilaya)}
-              onChange={(selected) => setSelectedWilaya(selected?.value || '')}
-              options={algerianWilayas}
-              className="w-full"
-              placeholder="Filtrer par wilaya de livraison..."
-              isClearable
-              styles={customStyles}
-              components={selectComponents}
             />
           </div>
         </div>
@@ -280,78 +274,82 @@ export function Promotions() {
         </div>
       ) : (
         <div className="bg-white shadow rounded-lg overflow-hidden">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Médicament
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Grossiste
-                </th>
-                <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Promotion
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Période
-                </th>
-                <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {promotions.map((promotion) => (
-                <tr key={promotion.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4">
-                    <div className="text-sm font-medium text-gray-900">
-                      {promotion.medications.commercial_name}
-                    </div>
-                    <div className="text-sm text-gray-500">
-                      {promotion.medications.form} - {promotion.medications.dosage}
-                      {promotion.medications.COND && ` (${promotion.medications.COND})`}
-                    </div>
-                    {promotion.medications.laboratory && (
-                      <div className="text-xs text-gray-500">
-                        {promotion.medications.laboratory}
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="text-sm font-medium text-gray-900">
-                      {promotion.wholesaler?.company_name || 'Grossiste inconnu'}
-                    </div>
-                    <div className="text-sm text-gray-500">
-                      {promotion.wholesaler?.wilaya || 'Wilaya non spécifiée'}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                      {promotion.free_units_percentage}% UG
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">
-                      Du {formatDate(promotion.start_date)}
-                    </div>
-                    <div className="text-sm text-gray-900">
-                      au {formatDate(promotion.end_date)}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button
-                      onClick={() => setSelectedPromotion(promotion)}
-                      disabled={orderLoading === promotion.id || !promotion.wholesaler}
-                      className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
-                    >
-                      <ShoppingCart className="h-4 w-4 mr-2" />
-                      Commander
-                    </button>
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200 ">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Médicament
+                  </th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Promotion
+                  </th>
+                  <th className="hidden sm:table-cell px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Période
+                  </th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Statut
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {promotions.map((promotion) => {
+                  const isActive = isPromotionActive(promotion);
+                  
+                  return (
+                    <tr key={promotion.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-4">
+                        <div className="text-sm font-medium text-gray-900 break-words">
+                          {promotion.medications.commercial_name}
+                        </div>
+                        <div className="text-sm text-gray-500 break-words">
+                          {promotion.medications.form} - {promotion.medications.dosage}
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 text-center">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                          {promotion.free_units_percentage}% UG
+                        </span>
+                      </td>
+                      <td className="hidden sm:table-cell px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <div>Du {formatDate(promotion.start_date)}</div>
+                        <div>au {formatDate(promotion.end_date)}</div>
+                      </td>
+                      <td className="px-4 py-4 text-center">
+                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                          isActive 
+                            ? 'bg-green-100 text-green-800'
+                            : new Date() < new Date(promotion.start_date)
+                              ? 'bg-yellow-100 text-yellow-800'
+                              : 'bg-red-100 text-red-800'
+                        }`}>
+                          {isActive 
+                            ? 'Active'
+                            : new Date() < new Date(promotion.start_date)
+                              ? 'À venir'
+                              : 'Terminée'
+                          }
+                        </span>
+                      </td>
+                      <td className="px-4 py-4 text-right">
+                        <button
+                          onClick={() => setSelectedPromotion(promotion)}
+                          disabled={orderLoading === promotion.id || !promotion.wholesaler}
+                          className="inline-flex items-center px-3 py-1.5 text-sm border border-transparent rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+                        >
+                          <ShoppingCart className="h-4 w-4 sm:mr-2" />
+                          <span className="hidden sm:inline">Commander</span>
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
