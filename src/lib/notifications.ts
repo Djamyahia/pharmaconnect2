@@ -31,25 +31,34 @@ function replacePlaceholders(text: string, replacements: Record<string, string>)
 
 async function sendEmail(to: string, subject: string, content: string) {
   try {
-    const response = await fetch('/api/send-email', {
+    const functionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-email-fixed`
+    
+    const response = await fetch(functionUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ to, subject, content }),
-    });
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+      },
+      body: JSON.stringify({
+        to,
+        subject,
+        content,
+      }),
+    })
 
     if (!response.ok) {
-      const result = await response.json();
-      console.error('Error response from send-email API:', result);
-      throw new Error(`Failed to send email: ${result.message || 'Unknown error'}`);
+      const result = await response.json()
+      console.error('Error response from send-email function:', result)
+      throw new Error(`Failed to send email: ${result.message || 'Unknown error'}`)
     }
 
-    const result = await response.json();
-    console.log('Email sent:', result);
+    const result = await response.json()
+    return { success: true, result }
   } catch (error) {
-    console.error('Error sending email:', error);
+    console.error('Error sending email:', error)
+    throw error
   }
 }
-
 
 export async function sendOrderNotification(
   type: string,
