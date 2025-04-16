@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import type { Order, OrderItem } from '../../types/supabase';
 import { sendOrderNotification } from '../../lib/notifications';
+import { UserLink } from '../../components/UserLink';
 
 type ExtendedOrder = Order & {
   pharmacist: {
@@ -106,13 +107,14 @@ export function Orders() {
 
       if (error) throw error;
 
-      // Update inventory quantities
+      // Update inventory quantities with explicit type casting
       if (order) {
         for (const item of order.order_items) {
           const { error: inventoryError } = await supabase.rpc('update_inventory_quantity', {
             p_wholesaler_id: user?.id,
             p_medication_id: item.medication_id,
-            p_quantity: item.quantity
+            p_quantity: item.quantity,
+            p_expiry_date: null // Explicitly pass null for expiry_date to select the correct overload
           });
           
           if (inventoryError) {
@@ -302,7 +304,7 @@ export function Orders() {
                       {getStatusIcon(order.status)}
                       <div>
                         <p className="text-sm font-medium text-gray-900">
-                          Commande de {order.pharmacist.company_name}
+                          Commande de <UserLink user={order.pharmacist} />
                         </p>
                         <p className="text-sm text-gray-500">
                           {formatDate(order.created_at)}
@@ -333,7 +335,7 @@ export function Orders() {
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
                           <p className="text-xs text-gray-500">Nom de l'entreprise</p>
-                          <p className="text-sm text-gray-900">{order.pharmacist.company_name}</p>
+                          <UserLink user={order.pharmacist} />
                         </div>
                         <div>
                           <p className="text-xs text-gray-500">Wilaya</p>
@@ -371,10 +373,10 @@ export function Orders() {
                         {order.order_items.map((item) => (
                           <tr key={item.id}>
                             <td className="px-4 py-2 text-sm text-gray-900">
-                              {item.medications.commercial_name}
+                              {item.medications ? item.medications.commercial_name : 'N/A'}
                             </td>
                             <td className="px-4 py-2 text-sm text-gray-500">
-                              {item.medications.form} - {item.medications.dosage}
+                              {item.medications ? `${item.medications.form} - ${item.medications.dosage}` : 'N/A'}
                             </td>
                             <td className="px-4 py-2 text-sm text-gray-900 text-right">
                               {item.quantity}

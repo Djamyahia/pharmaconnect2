@@ -7,6 +7,8 @@ import { customStyles, selectComponents } from '../../components/VirtualizedSele
 import type { Medication, WholesalerInventory } from '../../types/supabase';
 import { algerianWilayas } from '../../lib/wilayas';
 import { sendOrderNotification } from '../../lib/notifications';
+import { ProductTypeNav } from '../../components/ProductTypeNav';
+import { UserLink } from '../../components/UserLink';
 
 type MedicationWithInventory = Medication & {
   wholesaler_inventory: (WholesalerInventory & {
@@ -64,7 +66,7 @@ function OrderModal({ medication, inventory, price, onClose, onConfirm }: OrderM
             {medication.commercial_name} - {medication.form} {medication.dosage}
           </p>
           <p className="text-sm font-medium text-gray-900 mt-1">
-            De : {inventory.users.company_name}
+            De : <UserLink user={inventory.users} />
           </p>
           <p className="text-sm text-gray-600">
             Stock disponible : {inventory.quantity} unités
@@ -284,6 +286,7 @@ export function Products() {
 
   return (
     <div className="space-y-6">
+      <ProductTypeNav />
       <div className="bg-white shadow rounded-lg p-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="relative">
@@ -368,12 +371,16 @@ export function Products() {
                             className="flex flex-col p-4 bg-white border rounded-lg shadow-sm hover:shadow-md transition-shadow"
                           >
                             <div className="flex items-start justify-between">
-                              <div>
-                                <p className="font-medium text-gray-900">{inventory.users.company_name}</p>
-                                <p className="text-sm text-gray-600">{inventory.users.wilaya}</p>
-                                <p className="text-xs text-gray-500 mt-1">
-                                  Livre dans : {inventory.delivery_wilayas.map(w => algerianWilayas.find(aw => aw.value === w)?.label).join(', ')}
-                                </p>
+                              <div className="flex items-start space-x-3">
+                                <div className="flex-1">
+                                  <p className="font-medium text-gray-900">
+                                    <UserLink user={inventory.users} />
+                                  </p>
+                                  <p className="text-sm text-gray-600">{inventory.users.wilaya}</p>
+                                  <p className="text-xs text-gray-500 mt-1">
+                                    Livre dans : {inventory.delivery_wilayas.map(w => algerianWilayas.find(aw => aw.value === w)?.label).join(', ')}
+                                  </p>
+                                </div>
                               </div>
                               {activePromotion && (
                                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">

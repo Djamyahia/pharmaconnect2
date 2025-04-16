@@ -13,6 +13,43 @@ export type User = {
   delivery_wilayas: string[];
 };
 
+export type ParapharmacyProduct = {
+  id: string;
+  name: string;
+  brand: string | null;
+  category: ParapharmacyCategory;
+  description: string | null;
+  packaging: string | null;
+  reference: string | null;
+  image_data: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ParapharmacyCategory =
+  | 'hygiene_and_care'
+  | 'dermocosmetics'
+  | 'dietary_supplements'
+  | 'mother_and_baby'
+  | 'orthopedics'
+  | 'hair_care'
+  | 'veterinary'
+  | 'sun_care'
+  | 'medical_devices'
+  | 'accessories';
+
+export type WholesalerParapharmacyInventory = {
+  id: string;
+  wholesaler_id: string;
+  product_id: string;
+  quantity: number;
+  price: number;
+  delivery_wilayas: string[];
+  created_at: string;
+  updated_at: string;
+};
+
 export type Medication = {
   id: string;
   commercial_name: string;
@@ -48,9 +85,6 @@ export type Promotion = {
   start_date: string;
   end_date: string;
   created_at: string;
-  unit_price?: number;
-  units_for_bonus?: number;
-  bonus_units?: number;
 };
 
 export type Order = {
@@ -68,7 +102,9 @@ export type Order = {
 export type OrderItem = {
   id: string;
   order_id: string;
-  medication_id: string;
+  medication_id: string | null;
+  product_id: string | null;
+  is_parapharmacy: boolean;
   quantity: number;
   unit_price: number;
   created_at: string;

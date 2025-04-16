@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ShoppingCart, Clock, CheckCircle, XCircle, ChevronDown, ChevronUp, Loader2, AlertTriangle, Calendar } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import type { Order, OrderItem } from '../../types/supabase';
+import { UserLink } from '../../components/UserLink';
 
 type ExtendedOrder = Order & {
   wholesaler: {
@@ -10,12 +11,12 @@ type ExtendedOrder = Order & {
     phone: string;
   };
   order_items: (OrderItem & {
-    medications: {
+    medications?: {
       commercial_name: string;
       scientific_name: string;
       form: string;
       dosage: string;
-    };
+    } | null;
   })[];
 };
 
@@ -211,7 +212,7 @@ export function Orders() {
                       {getStatusIcon(order.status)}
                       <div>
                         <p className="text-sm font-medium text-gray-900">
-                          Commande de {order.wholesaler.company_name}
+                          Commande de <UserLink user={order.wholesaler} />
                         </p>
                         <p className="text-sm text-gray-500">
                           {formatDate(order.created_at)}
@@ -236,13 +237,12 @@ export function Orders() {
 
                 {expandedOrders.includes(order.id) && (
                   <div className="mt-4">
-                    {/* Wholesaler Details */}
                     <div className="bg-gray-50 rounded-lg p-4 mb-4">
                       <h4 className="text-sm font-medium text-gray-900 mb-2">Détails du grossiste</h4>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
                           <p className="text-xs text-gray-500">Nom de l'entreprise</p>
-                          <p className="text-sm text-gray-900">{order.wholesaler.company_name}</p>
+                          <UserLink user={order.wholesaler} />
                         </div>
                         <div>
                           <p className="text-xs text-gray-500">Wilaya</p>
@@ -255,7 +255,6 @@ export function Orders() {
                       </div>
                     </div>
 
-                    {/* Order Items */}
                     <table className="min-w-full divide-y divide-gray-200">
                       <thead>
                         <tr>
@@ -280,10 +279,10 @@ export function Orders() {
                         {order.order_items.map((item) => (
                           <tr key={item.id}>
                             <td className="px-4 py-2 text-sm text-gray-900">
-                              {item.medications.commercial_name}
+                              {item.medications?.commercial_name || 'N/A'}
                             </td>
                             <td className="px-4 py-2 text-sm text-gray-500">
-                              {item.medications.form} - {item.medications.dosage}
+                              {item.medications ? `${item.medications.form} - ${item.medications.dosage}` : 'N/A'}
                             </td>
                             <td className="px-4 py-2 text-sm text-gray-900 text-right">
                               {item.quantity}
