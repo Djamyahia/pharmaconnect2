@@ -58,6 +58,7 @@ function AddProductModal({ onClose, onSubmit }: AddProductModalProps) {
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showAllWilayas, setShowAllWilayas] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -117,6 +118,17 @@ function AddProductModal({ onClose, onSubmit }: AddProductModalProps) {
     { value: 'medical_devices', label: 'Dispositifs médicaux' },
     { value: 'accessories', label: 'Accessoires' }
   ];
+
+  const handleWilayaSelection = (selected: { value: string; label: string }[]) => {
+    setFormData({ ...formData, delivery_wilayas: selected.map(s => s.value) });
+  };
+
+  const selectAllWilayas = () => {
+    setFormData({ ...formData, delivery_wilayas: algerianWilayas.map(w => w.value) });
+  };
+
+  const selectedWilayasCount = formData.delivery_wilayas.length;
+  const totalWilayasCount = algerianWilayas.length;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -258,20 +270,62 @@ function AddProductModal({ onClose, onSubmit }: AddProductModalProps) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700">
-              Wilayas de livraison <span className="text-red-500">*</span>
-            </label>
-            <Select
-              isMulti
-              value={algerianWilayas.filter(w => formData.delivery_wilayas.includes(w.value))}
-              onChange={(selected) => setFormData({ ...formData, delivery_wilayas: selected.map(s => s.value) })}
-              options={algerianWilayas}
-              className="mt-1"
-              styles={customStyles}
-              components={selectComponents}
-              placeholder="Sélectionner les wilayas..."
-              defaultValue={user?.delivery_wilayas.map(w => algerianWilayas.find(aw => aw.value === w))}
-            />
+            <div className="flex justify-between items-center mb-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Wilayas de livraison <span className="text-red-500">*</span>
+              </label>
+              <div className="flex items-center space-x-4">
+                <button
+                  type="button"
+                  onClick={selectAllWilayas}
+                  className="text-sm text-indigo-600 hover:text-indigo-500"
+                >
+                  Sélectionner tout
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowAllWilayas(!showAllWilayas)}
+                  className="text-sm text-gray-600 hover:text-gray-500"
+                >
+                  {showAllWilayas ? 'Réduire' : 'Voir tout'}
+                </button>
+              </div>
+            </div>
+            
+            <div className={`transition-all duration-300 ${showAllWilayas ? '' : 'max-h-40 overflow-y-auto'}`}>
+              <Select
+                isMulti
+                value={algerianWilayas.filter(w => formData.delivery_wilayas.includes(w.value))}
+                onChange={handleWilayaSelection}
+                options={algerianWilayas}
+                className="mt-1"
+                styles={{
+                  ...customStyles,
+                  menuList: (base) => ({
+                    ...base,
+                    maxHeight: showAllWilayas ? '400px' : '200px',
+                  }),
+                }}
+                components={selectComponents}
+                placeholder="Sélectionner les wilayas..."
+                noOptionsMessage={() => "Aucune wilaya trouvée"}
+              />
+            </div>
+            
+            <div className="mt-2 text-sm text-gray-500 flex items-center justify-between">
+              <span>
+                {selectedWilayasCount} wilaya{selectedWilayasCount > 1 ? 's' : ''} sélectionnée{selectedWilayasCount > 1 ? 's' : ''} sur {totalWilayasCount}
+              </span>
+              {selectedWilayasCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, delivery_wilayas: [] })}
+                  className="text-red-600 hover:text-red-700"
+                >
+                  Tout désélectionner
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="flex justify-end space-x-3 pt-4">
@@ -424,38 +478,23 @@ export function Parapharmacy() {
   }
 
   async function handleDeleteProduct(productId: string) {
-    if (!confirm('Êtes-vous sûr de vouloir supprimer ce produit ?')) return;
+    if (!confirm('Êtes-vous sûr de vouloir supprimer ce produit ? Cette action supprimera également toutes les commandes associées à ce produit.')) return;
 
     try {
-      // First, delete any order items referencing this product
-      const { data: orderItems, error: orderItemsError } = await supabase
-        .from('order_items')
-        .select('id')
-        .eq('product_id', productId);
+      // Start a Supabase transaction by using RPC
+      const { data: result, error: rpcError } = await supabase.rpc('delete_parapharmacy_product', {
+        product_id_param: productId,
+        wholesaler_id_param: user?.id
+      });
 
-      if (orderItemsError) throw orderItemsError;
-
-      if (orderItems && orderItems.length > 0) {
-        const { error: deleteItemsError } = await supabase
-          .from('order_items')
-          .delete()
-          .in('id', orderItems.map(item => item.id));
-
-        if (deleteItemsError) throw deleteItemsError;
+      if (rpcError) {
+        throw rpcError;
       }
-
-      // Now we can safely delete the product
-      const { error } = await supabase
-        .from('parapharmacy_products')
-        .delete()
-        .match({ id: productId, created_by: user?.id });
-
-      if (error) throw error;
 
       await fetchProducts();
     } catch (error) {
       console.error('Error deleting product:', error);
-      setError('Erreur lors de la suppression du produit');
+      setError('Erreur lors de la suppression du produit. Il est possible que ce produit soit lié à des commandes en cours.');
     }
   }
 

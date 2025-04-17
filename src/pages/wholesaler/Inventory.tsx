@@ -37,6 +37,7 @@ export function Inventory() {
   const [error, setError] = useState<string>('');
   const [uploadLoading, setUploadLoading] = useState(false);
   const [uploadedItems, setUploadedItems] = useState<ExtendedInventoryItem[]>([]);
+  const [showAllWilayas, setShowAllWilayas] = useState(false);
   const [newItem, setNewItem] = useState({
     medication_id: '',
     quantity: 0,
@@ -362,7 +363,6 @@ export function Inventory() {
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
       const jsonData = XLSX.utils.sheet_to_json(worksheet);
 
-      // First, fetch all medications to have them available for matching
       const { data: medications, error: medError } = await supabase
         .from('medications')
         .select('*');
@@ -376,14 +376,12 @@ export function Inventory() {
         const { data: { id: tempId }, error: idError } = await supabase.rpc('generate_uuid');
         if (idError) throw idError;
 
-        // Normalize the strings for comparison
         const rowCommercialName = normalize(row.commercial_name || '');
         const rowForm = normalize(row.form || '');
         const rowDosage = normalize(row.dosage || '');
         const rowCOND = normalize(row.COND || '');
         const rowLaboratory = normalize(row.laboratory || '');
 
-        // Find exact match
         const match = medications.find(m => {
           const medCommercialName = normalize(m.commercial_name);
           const medForm = normalize(m.form);
@@ -416,7 +414,6 @@ export function Inventory() {
             medications: match,
           });
         } else {
-          // If no exact match, try fuzzy matching
           const suggestions = fuzzyMatch(row.commercial_name, row);
           
           newInventory.push({
@@ -434,7 +431,6 @@ export function Inventory() {
         }
       }
 
-      // Delete existing inventory
       const { error: deleteError } = await supabase
         .from('wholesaler_inventory')
         .delete()
@@ -442,7 +438,6 @@ export function Inventory() {
 
       if (deleteError) throw deleteError;
 
-      // Insert matched items
       if (itemsToInsert.length > 0) {
         const { error: insertError } = await supabase
           .from('wholesaler_inventory')
@@ -500,6 +495,17 @@ export function Inventory() {
       delivery_wilayas: item.delivery_wilayas
     });
   };
+
+  const handleWilayaSelection = (selected: { value: string; label: string }[]) => {
+    setNewItem({ ...newItem, delivery_wilayas: selected.map(s => s.value) });
+  };
+
+  const selectAllWilayas = () => {
+    setNewItem({ ...newItem, delivery_wilayas: algerianWilayas.map(w => w.value) });
+  };
+
+  const selectedWilayasCount = newItem.delivery_wilayas.length;
+  const totalWilayasCount = algerianWilayas.length;
 
   if (loading) {
     return (
@@ -733,7 +739,7 @@ export function Inventory() {
 
       {showAddForm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+          <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-start mb-4">
               <h3 className="text-lg font-semibold text-gray-900">Ajouter un nouveau produit</h3>
               <button
@@ -799,47 +805,86 @@ export function Inventory() {
                   min="0"
                   step="0.01"
                   value={newItem.price}
-                  onChange={(e) => setNewItem({ ...newItem, price: parseFloat(e.target.value) })}
+                  onChange={(e) => setNewItem({ ...newItem, price: parseFloat(e.target.value)
+                  })}
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Wilayas de livraison
-                </label>
-                <Select
-                  isMulti
-                  value={algerianWilayas.filter(w => newItem.delivery_wilayas.includes(w.value))}
-                  onChange={(selected) => setNewItem({
-                    ...newItem,
-                    delivery_wilayas: selected ? selected.map(option => option.value) : []
-                  })}
-                  options={algerianWilayas}
-                  className="mt-1"
-                  styles={customStyles}
-                  components={selectComponents}
-                  placeholder="Sélectionner les wilayas..."
-                  menuPortalTarget={document.body}
-                  menuPosition="fixed"
-                />
+                <div className="flex justify-between items-center mb-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Wilayas de livraison <span className="text-red-500">*</span>
+                  </label>
+                  <div className="flex items-center space-x-4">
+                    <button
+                      type="button"
+                      onClick={selectAllWilayas}
+                      className="text-sm text-indigo-600 hover:text-indigo-500"
+                    >
+                      Sélectionner tout
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowAllWilayas(!showAllWilayas)}
+                      className="text-sm text-gray-600 hover:text-gray-500"
+                    >
+                      {showAllWilayas ? 'Réduire' : 'Voir tout'}
+                    </button>
+                  </div>
+                </div>
+                
+                <div className={`transition-all duration-300 ${showAllWilayas ? '' : 'max-h-40 overflow-y-auto'}`}>
+                  <Select
+                    isMulti
+                    value={algerianWilayas.filter(w => newItem.delivery_wilayas.includes(w.value))}
+                    onChange={handleWilayaSelection}
+                    options={algerianWilayas}
+                    className="mt-1"
+                    styles={{
+                      ...customStyles,
+                      menuList: (base) => ({
+                        ...base,
+                        maxHeight: showAllWilayas ? '400px' : '200px',
+                      }),
+                    }}
+                    components={selectComponents}
+                    placeholder="Sélectionner les wilayas..."
+                    noOptionsMessage={() => "Aucune wilaya trouvée"}
+                  />
+                </div>
+                
+                <div className="mt-2 text-sm text-gray-500 flex items-center justify-between">
+                  <span>
+                    {selectedWilayasCount} wilaya{selectedWilayasCount > 1 ? 's' : ''} sélectionnée{selectedWilayasCount > 1 ? 's' : ''} sur {totalWilayasCount}
+                  </span>
+                  {selectedWilayasCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setNewItem({ ...newItem, delivery_wilayas: [] })}
+                      className="text-red-600 hover:text-red-700"
+                    >
+                      Tout désélectionner
+                    </button>
+                  )}
+                </div>
               </div>
 
-              <div className="flex justify-end space-x-3 mt-6">
+              <div className="flex justify-end space-x-3 pt-4">
                 <button
                   type="button"
                   onClick={() => {
                     setShowAddForm(false);
                     setError('');
                   }}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                  className="px-4 py-2 border rounded-md hover:bg-gray-50"
                 >
                   Annuler
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md hover:bg-indigo-700"
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
                 >
                   Ajouter
                 </button>

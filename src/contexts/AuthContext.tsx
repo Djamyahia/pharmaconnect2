@@ -100,13 +100,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   async function signOut() {
     try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-      setUser(null);
+      setUser(null); // Clear user state immediately
+      await supabase.auth.signOut();
       navigate('/');
     } catch (error) {
       console.error('Sign out error:', error);
-      throw error;
+      navigate('/'); // Still navigate to home even if sign-out fails
     }
   }
 

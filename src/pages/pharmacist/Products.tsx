@@ -32,11 +32,13 @@ type OrderModalProps = {
   price: number;
   onClose: () => void;
   onConfirm: (quantity: number) => void;
+  loading: boolean;
 };
 
-function OrderModal({ medication, inventory, price, onClose, onConfirm }: OrderModalProps) {
+function OrderModal({ medication, inventory, price, onClose, onConfirm, loading }: OrderModalProps) {
   const [quantity, setQuantity] = useState(1);
   const [error, setError] = useState('');
+  const [showAllWilayas, setShowAllWilayas] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,29 +53,86 @@ function OrderModal({ medication, inventory, price, onClose, onConfirm }: OrderM
     onConfirm(quantity);
   };
 
+  const formatWilayasList = (wilayas: string[]) => {
+    const wilayaNames = wilayas.map(w => 
+      algerianWilayas.find(aw => aw.value === w)?.label?.split(' - ')[1] || w
+    );
+    
+    if (!showAllWilayas && wilayaNames.length > 5) {
+      return (
+        <div className="space-y-1">
+          <div>{wilayaNames.slice(0, 5).join(', ')}</div>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              setShowAllWilayas(true);
+            }}
+            className="text-sm text-indigo-600 hover:text-indigo-700"
+          >
+            Voir {wilayaNames.length - 5} autres wilayas...
+          </button>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-1">
+        <div className="flex flex-wrap gap-1">
+          {wilayaNames.map((name, index) => (
+            <span
+              key={index}
+              className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800"
+            >
+              {name}
+            </span>
+          ))}
+        </div>
+        {showAllWilayas && wilayaNames.length > 5 && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              setShowAllWilayas(false);
+            }}
+            className="text-sm text-indigo-600 hover:text-indigo-700"
+          >
+            Voir moins
+          </button>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg p-6 max-w-md w-full">
+      <div className="bg-white rounded-lg p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-start mb-4">
           <h3 className="text-lg font-semibold text-gray-900">Passer une commande</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-500">
+          <button 
+            onClick={onClose} 
+            className="text-gray-400 hover:text-gray-500"
+            disabled={loading}
+          >
             <X className="h-5 w-5" />
           </button>
         </div>
 
         <div className="mb-4">
-          <p className="text-sm text-gray-600">
+          <div className="text-sm text-gray-600 mb-2">
             {medication.commercial_name} - {medication.form} {medication.dosage}
-          </p>
+          </div>
           <p className="text-sm font-medium text-gray-900 mt-1">
             De : <UserLink user={inventory.users} />
           </p>
-          <p className="text-sm text-gray-600">
-            Stock disponible : {inventory.quantity} unités
-          </p>
-          <p className="text-sm font-medium text-gray-900 mt-2">
-            Prix unitaire : {inventory.price.toFixed(2)} DZD
-          </p>
+          <div className="mt-2">
+            <p className="text-sm text-gray-500">Stock disponible : {inventory.quantity} unités</p>
+            <p className="text-sm font-medium text-gray-900">Prix unitaire : {inventory.price.toFixed(2)} DZD</p>
+          </div>
+          <div className="mt-2">
+            <p className="text-sm text-gray-500 mb-1">Wilayas de livraison :</p>
+            {formatWilayasList(inventory.delivery_wilayas)}
+          </div>
         </div>
 
         {error && (
@@ -98,6 +157,8 @@ function OrderModal({ medication, inventory, price, onClose, onConfirm }: OrderM
                 setQuantity(parseInt(e.target.value) || 0);
               }}
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+              required
+              disabled={loading}
             />
           </div>
 
@@ -112,15 +173,24 @@ function OrderModal({ medication, inventory, price, onClose, onConfirm }: OrderM
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 border rounded-md hover:bg-gray-50"
+              className="px-4 py-2 border rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={loading}
             >
               Annuler
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+              disabled={loading}
+              className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
             >
-              Commander
+              {loading ? (
+                <>
+                  <Loader2 className="animate-spin h-4 w-4 mr-2" />
+                  Commande en cours...
+                </>
+              ) : (
+                'Commander'
+              )}
             </button>
           </div>
         </form>
@@ -147,6 +217,7 @@ export function Products() {
     inventory: null,
     price: 0
   });
+  const [orderLoading, setOrderLoading] = useState(false);
 
   useEffect(() => {
     if (user?.id) {
@@ -229,6 +300,8 @@ export function Products() {
     }
 
     try {
+      setOrderLoading(true);
+
       const { data: orderData, error: orderError } = await supabase
         .from('orders')
         .insert({
@@ -273,6 +346,8 @@ export function Products() {
     } catch (error) {
       console.error('Error creating order:', error);
       alert('Échec de la création de la commande. Veuillez réessayer.');
+    } finally {
+      setOrderLoading(false);
     }
   }
 
@@ -405,8 +480,8 @@ export function Products() {
                                   inventory,
                                   price: inventory.price
                                 })}
-                                className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
-                                disabled={inventory.quantity === 0}
+                                disabled={inventory.quantity === 0 || orderLoading}
+                                className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                               >
                                 <ShoppingCart className="h-4 w-4 mr-2" />
                                 Commander
@@ -431,6 +506,7 @@ export function Products() {
           price={orderModal.price}
           onClose={() => setOrderModal({ show: false, medication: null, inventory: null, price: 0 })}
           onConfirm={(quantity) => createOrder(orderModal.medication!, orderModal.inventory!, quantity)}
+          loading={orderLoading}
         />
       )}
     </div>

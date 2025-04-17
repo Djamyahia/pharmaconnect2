@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Search, Filter, Loader2, ShoppingCart, X, Download } from 'lucide-react';
+import { Search, Filter, Loader2, ShoppingCart, X, Download, Package } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import Select from 'react-select';
@@ -8,6 +8,7 @@ import type { ParapharmacyProduct, WholesalerParapharmacyInventory } from '../..
 import { algerianWilayas } from '../../lib/wilayas';
 import { ProductTypeNav } from '../../components/ProductTypeNav';
 import { UserLink } from '../../components/UserLink';
+import { sendOrderNotification } from '../../lib/notifications';
 import * as unorm from 'unorm';
 import * as XLSX from 'xlsx';
 
@@ -32,6 +33,7 @@ type OrderModalProps = {
 function OrderModal({ item, onClose, onConfirm, loading }: OrderModalProps) {
   const [quantity, setQuantity] = useState(1);
   const [error, setError] = useState('');
+  const [showAllWilayas, setShowAllWilayas] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,15 +48,85 @@ function OrderModal({ item, onClose, onConfirm, loading }: OrderModalProps) {
     onConfirm(quantity);
   };
 
+  const formatWilayasList = (wilayas: string[]) => {
+    const wilayaNames = wilayas.map(w => 
+      algerianWilayas.find(aw => aw.value === w)?.label?.split(' - ')[1] || w
+    );
+    
+    if (!showAllWilayas && wilayaNames.length > 5) {
+      return (
+        <div className="space-y-1">
+          <div className="flex flex-wrap gap-1">
+            {wilayaNames.slice(0, 5).map((name, index) => (
+              <span
+                key={index}
+                className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800"
+              >
+                {name}
+              </span>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              setShowAllWilayas(true);
+            }}
+            className="text-sm text-indigo-600 hover:text-indigo-700"
+          >
+            Voir {wilayaNames.length - 5} autres wilayas...
+          </button>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-1">
+        <div className="flex flex-wrap gap-1">
+          {wilayaNames.map((name, index) => (
+            <span
+              key={index}
+              className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800"
+            >
+              {name}
+            </span>
+          ))}
+        </div>
+        {showAllWilayas && wilayaNames.length > 5 && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              setShowAllWilayas(false);
+            }}
+            className="text-sm text-indigo-600 hover:text-indigo-700"
+          >
+            Voir moins
+          </button>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg p-6 max-w-md w-full">
+      <div className="bg-white rounded-lg p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-start mb-4">
           <h3 className="text-lg font-semibold text-gray-900">Passer une commande</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-500">
+          <button 
+            onClick={onClose} 
+            className="text-gray-400 hover:text-gray-500"
+            disabled={loading}
+          >
             <X className="h-5 w-5" />
           </button>
         </div>
+
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-md">
+            {error}
+          </div>
+        )}
 
         <div className="mb-4">
           <div className="text-sm text-gray-600 mb-2">
@@ -64,27 +136,17 @@ function OrderModal({ item, onClose, onConfirm, loading }: OrderModalProps) {
             )}
           </div>
           <p className="text-sm font-medium text-gray-900 mt-1">
-            Vendu par <UserLink user={item.wholesaler} />
+            De : <UserLink user={item.wholesaler} />
           </p>
           <div className="mt-2">
             <p className="text-sm text-gray-500">Stock disponible : {item.quantity} unités</p>
             <p className="text-sm font-medium text-gray-900">Prix unitaire : {item.price.toFixed(2)} DZD</p>
           </div>
           <div className="mt-2">
-            <p className="text-sm text-gray-500">Wilayas de livraison :</p>
-            <p className="text-sm text-gray-900">
-              {item.wholesaler.delivery_wilayas.map(w => 
-                algerianWilayas.find(aw => aw.value === w)?.label
-              ).join(', ')}
-            </p>
+            <p className="text-sm text-gray-500 mb-1">Wilayas de livraison :</p>
+            {formatWilayasList(item.wholesaler.delivery_wilayas)}
           </div>
         </div>
-
-        {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-md">
-            {error}
-          </div>
-        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -103,6 +165,7 @@ function OrderModal({ item, onClose, onConfirm, loading }: OrderModalProps) {
               }}
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
               required
+              disabled={loading}
             />
           </div>
 
@@ -117,16 +180,24 @@ function OrderModal({ item, onClose, onConfirm, loading }: OrderModalProps) {
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 border rounded-md hover:bg-gray-50"
+              className="px-4 py-2 border rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={loading}
             >
               Annuler
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50"
+              className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
             >
-              {loading ? 'Commande en cours...' : 'Commander'}
+              {loading ? (
+                <>
+                  <Loader2 className="animate-spin h-4 w-4 mr-2" />
+                  Commande en cours...
+                </>
+              ) : (
+                'Commander'
+              )}
             </button>
           </div>
         </form>
@@ -370,60 +441,59 @@ export function Parapharmacy() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredInventory.map((item) => (
-  <div
-    key={item.id}
-    className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow overflow-hidden"
-  >
-    {item.product.image_data && (
-      <div className="aspect-w-16 aspect-h-9">
-        <img
-          src={item.product.image_data}
-          alt={item.product.name}
-          className="w-full h-48 object-cover"
-        />
-      </div>
-    )}
-    <div className="p-6 flex flex-col gap-y-3">
-      <h3 className="text-lg font-medium text-gray-900">
-        {item.product.name}
-        {item.product.brand && (
-          <span className="text-gray-500 text-sm ml-2">
-            - {item.product.brand}
-          </span>
-        )}
-      </h3>
+            <div
+              key={item.id}
+              className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow overflow-hidden"
+            >
+              {item.product.image_data && (
+                <div className="aspect-w-16 aspect-h-9">
+                  <img
+                    src={item.product.image_data}
+                    alt={item.product.name}
+                    className="w-full h-48 object-cover"
+                  />
+                </div>
+              )}
+              <div className="p-6 flex flex-col gap-y-3">
+                <h3 className="text-lg font-medium text-gray-900">
+                  {item.product.name}
+                  {item.product.brand && (
+                    <span className="text-gray-500 text-sm ml-2">
+                      - {item.product.brand}
+                    </span>
+                  )}
+                </h3>
 
-      <p className="text-sm text-gray-500">
-        Vendu par <UserLink user={item.wholesaler} />
-      </p>
+                <p className="text-sm text-gray-500">
+                  Vendu par <UserLink user={item.wholesaler} />
+                </p>
 
-      {item.product.description && (
-        <p className="text-sm text-gray-600 line-clamp-2">
-          {item.product.description}
-        </p>
-      )}
+                {item.product.description && (
+                  <p className="text-sm text-gray-600 line-clamp-2">
+                    {item.product.description}
+                  </p>
+                )}
 
-      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 w-fit">
-        {categoryOptions.find(opt => opt.value === item.product.category)?.label}
-      </span>
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 w-fit">
+                  {categoryOptions.find(opt => opt.value === item.product.category)?.label}
+                </span>
 
-      <div>
-        <p className="text-lg font-bold text-gray-900">{item.price.toFixed(2)} DZD</p>
-        <p className="text-sm text-gray-600">Stock: {item.quantity}</p>
-      </div>
+                <div>
+                  <p className="text-lg font-bold text-gray-900">{item.price.toFixed(2)} DZD</p>
+                  <p className="text-sm text-gray-600">Stock: {item.quantity}</p>
+                </div>
 
-      <button
-        onClick={() => setOrderModal({ show: true, item })}
-        disabled={item.quantity === 0}
-        className="mt-2 inline-flex items-center justify-center px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        <ShoppingCart className="h-4 w-4 mr-2" />
-        <span>Commander</span>
-      </button>
-    </div>
-  </div>
-))}
-
+                <button
+                  onClick={() => setOrderModal({ show: true, item })}
+                  disabled={item.quantity === 0}
+                  className="mt-2 inline-flex items-center justify-center px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ShoppingCart className="h-4 w-4 mr-2" />
+                  <span>Commander</span>
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
@@ -438,3 +508,4 @@ export function Parapharmacy() {
     </div>
   );
 }
+

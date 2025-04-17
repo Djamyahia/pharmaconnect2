@@ -1,3 +1,37 @@
+-- Update the order_canceled template to remove reason field
+UPDATE email_templates 
+SET content = 'Bonjour {{recipient_name}},
+
+La commande {{order_id}} a été annulée.
+
+Détails de la commande :
+- Produit : {{product_name}}{{#if product_form}} ({{product_form}} {{product_dosage}}){{/if}}
+{{#if product_brand}}- Marque : {{product_brand}}{{/if}}
+{{#if product_category}}- Catégorie : {{product_category}}{{/if}}
+- Quantité : {{quantity}} unités
+- Prix unitaire : {{unit_price}} DZD
+- Sous-total : {{subtotal}} DZD
+- Montant total : {{total_amount}} DZD
+- Statut : Annulée
+
+Pour plus d''informations, veuillez vous connecter à votre tableau de bord.
+
+Cordialement,
+L''équipe PharmaConnect'
+WHERE type = 'order_canceled';
+
+-- Drop cancel_reason column from orders table if it exists
+DO $$ 
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'orders' AND column_name = 'cancel_reason'
+  ) THEN
+    ALTER TABLE orders DROP COLUMN cancel_reason;
+  END IF;
+END $$;
+
+-- Update the notify_order_status function to remove cancel_reason
 CREATE OR REPLACE FUNCTION notify_order_status()
 RETURNS TRIGGER AS $$
 DECLARE

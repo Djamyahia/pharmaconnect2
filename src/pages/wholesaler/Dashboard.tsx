@@ -1,6 +1,6 @@
 import React from "react";
 import { Routes, Route, Link, useLocation } from "react-router-dom";
-import { Package, ShoppingCart, Percent, User, TrendingUp, Sparkles } from "lucide-react";
+import { Package, ShoppingCart, Percent, User, TrendingUp, Sparkles, Clock } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { Inventory } from "./Inventory";
 import { Orders } from "./Orders";
@@ -8,12 +8,14 @@ import { Promotions } from "./Promotions";
 import { Analytics } from "./Analytics";
 import { Profile } from "../shared/Profile";
 import { Parapharmacy } from "./Parapharmacy";
+import { DailyActions } from "./DailyActions";
 
 const WholesalerDashboard: React.FC = () => {
   const location = useLocation();
   const { user } = useAuth();
 
   const navigation = [
+    { name: 'Actions du jour', href: '/wholesaler/daily', icon: Clock },
     { name: 'Pharmacie', href: '/wholesaler/inventory', icon: Package },
     { name: 'Parapharmacie', href: '/wholesaler/parapharmacy', icon: Sparkles },
     { name: 'Commandes', href: '/wholesaler/orders', icon: ShoppingCart },
@@ -91,7 +93,7 @@ const WholesalerDashboard: React.FC = () => {
 
       {/* Mobile navigation */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t z-10">
-        <div className="grid grid-cols-6 gap-1">
+        <div className="grid grid-cols-7 gap-1">
           {navigation.map((item) => {
             const isActive = location.pathname === item.href;
             return (
@@ -116,6 +118,7 @@ const WholesalerDashboard: React.FC = () => {
           <div className="py-6">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
               <Routes>
+                <Route path="daily" element={<DailyActions />} />
                 <Route path="inventory" element={<Inventory />} />
                 <Route path="parapharmacy" element={<Parapharmacy />} />
                 <Route path="orders" element={<Orders />} />
