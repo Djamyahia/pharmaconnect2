@@ -3,10 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Lock } from 'lucide-react';
 
-
-
 export function UpdatePassword() {
-  console.log("Le composant UpdatePassword est monté !");
+  console.log("✅ Composant UpdatePassword est monté !");
+  
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -74,10 +73,10 @@ export function UpdatePassword() {
       <div className="flex flex-col items-center justify-center min-h-screen">
         <p className="mb-4 text-red-600 text-center">{error}</p>
         <button
-          onClick={() => navigate('/forgot-password')}
+          onClick={() => navigate('/login')}
           className="px-4 py-2 bg-indigo-600 text-white rounded-md"
         >
-          Demander un nouveau lien
+          Retour à la connexion
         </button>
       </div>
     );
@@ -85,6 +84,11 @@ export function UpdatePassword() {
 
   return (
     <div className="max-w-md mx-auto mt-12 p-6 bg-white shadow-md rounded">
+      {/* ✅ titre de debug visible */}
+      <h1 className="text-xl font-bold text-center text-red-600 mb-6">
+        Composant UpdatePassword affiché
+      </h1>
+
       <div className="text-center mb-8">
         <Lock className="h-12 w-12 text-indigo-600 mx-auto mb-4" />
         <h2 className="text-3xl font-bold">Définissez un nouveau mot de passe</h2>
