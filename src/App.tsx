@@ -4,7 +4,7 @@ import { Layout } from './components/Layout';
 import { AuthProvider } from './contexts/AuthContext';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
-import { ResetPassword } from './pages/ResetPassword';
+import { UpdatePassword } from './pages/UpdatePassword';
 import { VerifyEmail } from './pages/VerifyEmail';
 import PharmacistDashboard from './pages/pharmacist/Dashboard';
 import WholesalerDashboard from './pages/wholesaler/Dashboard';
@@ -44,7 +44,7 @@ function App() {
             <Route path="login" element={<Login />} />
             <Route path="register" element={<Register />} />
             <Route path="verify-email" element={<VerifyEmail />} />
-            <Route path="reset-password" element={<ResetPassword />} />
+            <Route path="update-password" element={<UpdatePassword />} />
             <Route path="pharmacist/*" element={<PharmacistDashboard />} />
             <Route path="wholesaler/*" element={<WholesalerDashboard />} />
             <Route path="admin/*" element={<AdminDashboard />} />

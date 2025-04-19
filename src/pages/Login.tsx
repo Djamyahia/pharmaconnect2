@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { LogIn, Mail } from 'lucide-react';
+import { LogIn, Mail, CheckCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 export function Login() {
@@ -14,8 +14,7 @@ export function Login() {
   const navigate = useNavigate();
   const { signIn, user } = useAuth();
 
-  // Redirect if already logged in
-  React.useEffect(() => {
+  useEffect(() => {
     if (user) {
       navigate(`/${user.role}`);
     }
@@ -23,7 +22,7 @@ export function Login() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    
+
     try {
       setError('');
       setLoading(true);
@@ -43,15 +42,20 @@ export function Login() {
 
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
+        redirectTo: 'https://pharmaconnect-dz.com/update-password',
       });
 
       if (error) throw error;
 
-      setSuccess('Un email de réinitialisation a été envoyé à votre adresse email.');
-      setShowResetPassword(false);
+      setSuccess("✅ Un email vous a été envoyé. Cliquez sur le lien dans votre boîte mail pour définir un nouveau mot de passe.");
+      
+      // ⏳ Redirection automatique vers la connexion après 4s
+      setTimeout(() => {
+        setShowResetPassword(false);
+        setSuccess('');
+      }, 4000);
     } catch (err) {
-      setError('Erreur lors de l\'envoi de l\'email de réinitialisation.');
+      setError("Erreur lors de l'envoi de l'email de réinitialisation.");
     } finally {
       setLoading(false);
     }
@@ -75,8 +79,9 @@ export function Login() {
         )}
 
         {success && (
-          <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md mb-4">
-            {success}
+          <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md mb-4 flex items-center">
+            <CheckCircle className="h-5 w-5 mr-2 text-green-600" />
+            <span>{success}</span>
           </div>
         )}
 
