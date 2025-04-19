@@ -4,8 +4,6 @@ import { supabase } from '../lib/supabase';
 import { Lock } from 'lucide-react';
 
 export function UpdatePassword() {
-  console.log("✅ Composant UpdatePassword est monté !");
-  
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -16,19 +14,27 @@ export function UpdatePassword() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const checkUser = async () => {
+    const checkSession = async () => {
       const { data, error } = await supabase.auth.getUser();
 
-      if (error || !data?.user) {
-        setError("Lien invalide ou expiré. Veuillez demander un nouveau lien.");
-        setUserExists(false);
-      } else {
+      if (data?.user) {
         setUserExists(true);
+        setCheckingSession(false);
+      } else {
+        const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+          if (session?.user) {
+            setUserExists(true);
+          } else {
+            setError("Lien invalide ou expiré. Veuillez demander un nouveau lien.");
+            setUserExists(false);
+          }
+          setCheckingSession(false);
+          listener.subscription.unsubscribe();
+        });
       }
-      setCheckingSession(false);
     };
 
-    checkUser();
+    checkSession();
   }, []);
 
   const handleUpdatePassword = async (e: React.FormEvent) => {
@@ -84,11 +90,6 @@ export function UpdatePassword() {
 
   return (
     <div className="max-w-md mx-auto mt-12 p-6 bg-white shadow-md rounded">
-      {/* ✅ titre de debug visible */}
-      <h1 className="text-xl font-bold text-center text-red-600 mb-6">
-        Composant UpdatePassword affiché
-      </h1>
-
       <div className="text-center mb-8">
         <Lock className="h-12 w-12 text-indigo-600 mx-auto mb-4" />
         <h2 className="text-3xl font-bold">Définissez un nouveau mot de passe</h2>
