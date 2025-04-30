@@ -20,11 +20,14 @@ type ExtendedProduct = ParapharmacyProduct & {
 };
 
 type EditingProduct = {
-  id: string;
+  id: string; // ID de l'inventaire
+  product_id: string; // ID du produit parapharmaceutique
   quantity: number;
   price: number;
   delivery_wilayas: string[];
+  image_data: string;
 };
+
 
 type AddProductModalProps = {
   onClose: () => void;
@@ -383,9 +386,10 @@ export function Parapharmacy() {
         `)
         .eq('created_by', user?.id);
 
-      if (searchQuery) {
-        query = query.textSearch('search_vector', searchQuery);
-      }
+        if (searchQuery) {
+          query = query.ilike('name', `%${searchQuery}%`);
+        }
+        
 
       if (selectedCategory) {
         query = query.eq('category', selectedCategory);
@@ -456,9 +460,10 @@ export function Parapharmacy() {
 
   async function handleUpdateProduct(id: string) {
     if (!editingProduct) return;
-
+  
     try {
-      const { error } = await supabase
+      // 1. Mettre à jour l’inventaire
+      const { error: inventoryError } = await supabase
         .from('wholesaler_parapharmacy_inventory')
         .update({
           quantity: editingProduct.quantity,
@@ -466,9 +471,18 @@ export function Parapharmacy() {
           delivery_wilayas: editingProduct.delivery_wilayas
         })
         .eq('id', id);
-
-      if (error) throw error;
-
+  
+      if (inventoryError) throw inventoryError;
+  
+      // 2. Mettre à jour l’image dans le produit
+      const { error: productError } = await supabase
+        .from('parapharmacy_products')
+        .update({ image_data: editingProduct.image_data })
+        .eq('id', editingProduct.product_id);
+  
+      if (productError) throw productError;
+  
+      // Nettoyage et reload
       setEditingProduct(null);
       fetchProducts();
     } catch (error) {
@@ -476,51 +490,94 @@ export function Parapharmacy() {
       setError('Erreur lors de la mise à jour du produit');
     }
   }
+  
 
   async function handleDeleteProduct(productId: string) {
-    if (!confirm('Êtes-vous sûr de vouloir supprimer ce produit ? Cette action supprimera également toutes les commandes associées à ce produit.')) return;
-
+    if (!confirm('Êtes-vous sûr de vouloir supprimer ce produit ?')) return;
+  
     try {
-      // Start a Supabase transaction by using RPC
-      const { data: result, error: rpcError } = await supabase.rpc('delete_parapharmacy_product', {
-        product_id_param: productId,
-        wholesaler_id_param: user?.id
-      });
-
-      if (rpcError) {
-        throw rpcError;
-      }
-
+      // 1. Supprimer les éventuels éléments de commande liés à ce produit
+      const { error: orderItemsError } = await supabase
+        .from('order_items')
+        .delete()
+        .eq('product_id', productId);
+  
+      if (orderItemsError) throw orderItemsError;
+  
+      // 2. Supprimer l'inventaire lié à ce produit pour le grossiste
+      const { error: deleteInventoryError } = await supabase
+        .from('wholesaler_parapharmacy_inventory')
+        .delete()
+        .match({ product_id: productId, wholesaler_id: user?.id });
+  
+      if (deleteInventoryError) throw deleteInventoryError;
+  
+      // 3. Supprimer le produit lui-même
+      const { error: deleteProductError } = await supabase
+        .from('parapharmacy_products')
+        .delete()
+        .match({ id: productId, created_by: user?.id });
+  
+      if (deleteProductError) throw deleteProductError;
+  
+      // Rafraîchir la liste
       await fetchProducts();
     } catch (error) {
       console.error('Error deleting product:', error);
-      setError('Erreur lors de la suppression du produit. Il est possible que ce produit soit lié à des commandes en cours.');
+      setError('Erreur lors de la suppression du produit');
     }
   }
+  
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file || !user?.id) return;
-
+  
+    const unrecognizedCategories: string[] = [];
+  
+    // Fonction pour "nettoyer" les catégories (enlever accents, majuscules, etc.)
+    const normalizeCategory = (value: string | undefined): string =>
+      value?.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') || '';
+  
+    const categoryMap: Record<string, ParapharmacyCategory> = {
+      "hygiene et soins": "hygiene_and_care",
+      "dermocosmetique": "dermocosmetics",
+      "complements alimentaires": "dietary_supplements",
+      "maman et bebe": "mother_and_baby",
+      "orthopedie": "orthopedics",
+      "soins capillaires": "hair_care",
+      "produits veterinaires": "veterinary",
+      "produits solaires": "sun_care",
+      "dispositifs medicaux": "medical_devices",
+      "accessoires": "accessories"
+    };
+  
     setUploadLoading(true);
     setError('');
-
+  
     try {
       const data = await file.arrayBuffer();
       const workbook = XLSX.read(data);
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
       const jsonData = XLSX.utils.sheet_to_json(worksheet);
-
-      // First, create all products
+  
       for (const row of jsonData as any[]) {
         try {
-          // Create the product
+          const normalized = normalizeCategory(row.category);
+          const cat = categoryMap[normalized];
+  
+          if (!cat) {
+            unrecognizedCategories.push(row.category);
+            continue;
+          }
+  
+          // Insert product
           const { data: productData, error: productError } = await supabase
             .from('parapharmacy_products')
             .insert({
               name: row.name,
               brand: row.brand,
-              category: row.category,
+              category: cat,
               description: row.description || null,
               packaging: row.packaging || null,
               reference: row.reference || null,
@@ -529,10 +586,10 @@ export function Parapharmacy() {
             })
             .select()
             .single();
-
+  
           if (productError) throw productError;
-
-          // Create the inventory entry
+  
+          // Insert inventory
           const { error: inventoryError } = await supabase
             .from('wholesaler_parapharmacy_inventory')
             .insert({
@@ -542,16 +599,20 @@ export function Parapharmacy() {
               price: parseFloat(row.price) || 0,
               delivery_wilayas: user.delivery_wilayas
             });
-
+  
           if (inventoryError) throw inventoryError;
         } catch (error) {
           console.error('Error processing row:', row, error);
-          // Continue with next row even if this one fails
         }
       }
-
+  
       await fetchProducts();
-      alert('Import terminé avec succès !');
+  
+      if (unrecognizedCategories.length > 0) {
+        alert(`Import terminé avec succès, mais certaines catégories n'ont pas été reconnues et ont été ignorées :\n\n- ${[...new Set(unrecognizedCategories)].join('\n- ')}`);
+      } else {
+        alert('Import terminé avec succès !');
+      }
     } catch (error) {
       console.error('Error uploading products:', error);
       setError('Erreur lors de l\'import du fichier. Vérifiez le format des données.');
@@ -560,33 +621,55 @@ export function Parapharmacy() {
       event.target.value = '';
     }
   };
+  
 
   const downloadTemplate = () => {
     try {
+      // Feuille principale « Produits »
       const template = [
         {
           name: 'Crème hydratante',
           brand: 'Marque',
-          category: 'dermocosmetics',
-          description: 'Description du produit',
+          category: 'Dermocosmétique', // <- texte utilisateur, pas ENUM
+          description: 'Hydrate la peau',
           packaging: 'Tube 50ml',
-          reference: 'REF123',
+          reference: 'CR123',
           image_data: '',
           quantity: 100,
-          price: 1000.00
+          price: 1200
         }
       ];
-
-      const ws = XLSX.utils.json_to_sheet(template);
+      const wsTemplate = XLSX.utils.json_to_sheet(template);
+  
+      // Feuille « Instructions » avec toutes les catégories utilisables
+      const instructions = [
+        ['Catégories valides pour la colonne "category"'],
+        ['Hygiène & soins'],
+        ['Dermocosmétique'],
+        ['Compléments alimentaires'],
+        ['Maman & bébé'],
+        ['Orthopédie'],
+        ['Soins capillaires'],
+        ['Produits vétérinaires'],
+        ['Produits solaires'],
+        ['Dispositifs médicaux'],
+        ['Accessoires'],
+        [],
+        ['⚠️ Respectez exactement l’orthographe et les accents pour éviter les erreurs à l’import.']
+      ];
+      const wsInstructions = XLSX.utils.aoa_to_sheet(instructions);
+  
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Template');
-      
+      XLSX.utils.book_append_sheet(wb, wsTemplate, 'Produits');
+      XLSX.utils.book_append_sheet(wb, wsInstructions, 'Instructions');
+  
       XLSX.writeFile(wb, 'parapharmacy_template.xlsx');
     } catch (error) {
       console.error('Error downloading template:', error);
       setError('Erreur lors du téléchargement du modèle');
     }
   };
+  
 
   const categoryOptions = [
     { value: '', label: 'Toutes les catégories' },
@@ -720,6 +803,9 @@ export function Parapharmacy() {
                 <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
                 </th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+  Image
+</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -789,6 +875,24 @@ export function Parapharmacy() {
                       )}
                     </td>
                     <td className="px-6 py-4 text-center">
+  {editingProduct?.id === inventory.id ? (
+    <ImageUpload
+      value={editingProduct.image_data}
+      onChange={(image) => setEditingProduct({ ...editingProduct, image_data: image })}
+      onClear={() => setEditingProduct({ ...editingProduct, image_data: '' })}
+    />
+  ) : (
+    product.image_data && (
+      <img
+        src={product.image_data}
+        alt={product.name}
+        className="h-10 w-10 object-cover rounded"
+      />
+    )
+  )}
+</td>
+
+                    <td className="px-6 py-4 text-center">
                       {editingProduct?.id === inventory.id ? (
                         <div className="flex justify-center space-x-2">
                           <button
@@ -809,10 +913,13 @@ export function Parapharmacy() {
                           <button
                             onClick={() => setEditingProduct({
                               id: inventory.id,
+                              product_id: product.id,
                               quantity: inventory.quantity,
                               price: inventory.price,
-                              delivery_wilayas: inventory.delivery_wilayas
+                              delivery_wilayas: inventory.delivery_wilayas,
+                              image_data: product.image_data || ''
                             })}
+                            
                             className="text-indigo-600 hover:text-indigo-900"
                           >
                             <Edit2 className="h-5 w-5" />
