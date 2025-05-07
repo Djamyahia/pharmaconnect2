@@ -1,7 +1,7 @@
 import React from 'react';
 import { Outlet, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Pill, LogOut, Menu, X } from 'lucide-react';
+import { Pill, LogOut, Menu, X, Tag } from 'lucide-react';
 import { NotificationBell } from './NotificationBell';
 
 export function Layout() {
@@ -18,6 +18,15 @@ export function Layout() {
                 <Pill className="h-8 w-8 text-indigo-600" />
                 <span className="ml-2 text-xl font-semibold text-gray-900">PharmaConnect</span>
               </Link>
+              <div className="hidden md:ml-6 md:flex md:space-x-8">
+                <Link
+                  to="/offers"
+                  className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-500 hover:text-indigo-600 hover:border-indigo-300"
+                >
+                  <Tag className="h-4 w-4 mr-1" />
+                  Offres promotionnelles
+                </Link>
+              </div>
             </div>
 
             {/* Mobile menu button */}
@@ -77,6 +86,14 @@ export function Layout() {
         {/* Mobile menu */}
         <div className={`${mobileMenuOpen ? 'block' : 'hidden'} md:hidden`}>
           <div className="pt-2 pb-3 space-y-1">
+            <Link
+              to="/offers"
+              className="block px-4 py-2 text-base font-medium text-gray-700 hover:text-indigo-600 hover:bg-gray-50"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Offres promotionnelles
+            </Link>
+            
             {user ? (
               <>
                 <Link

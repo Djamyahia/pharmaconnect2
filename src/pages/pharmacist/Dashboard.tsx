@@ -1,6 +1,6 @@
 import React from "react";
 import { Routes, Route, Link, useLocation } from "react-router-dom";
-import { Package, ShoppingCart, Percent, User, TrendingUp, Sparkles } from "lucide-react";
+import { Package, ShoppingCart, Percent, User, TrendingUp, Sparkles, Tag } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { Products } from "./Products";
 import { Orders } from "./Orders";
@@ -8,6 +8,7 @@ import { Promotions } from "./Promotions";
 import { Analytics } from "./Analytics";
 import { Profile } from "../shared/Profile";
 import { Parapharmacy } from "./Parapharmacy";
+import { SpecialOffers } from "./SpecialOffers";
 
 const PharmacistDashboard: React.FC = () => {
   const location = useLocation();
@@ -18,6 +19,7 @@ const PharmacistDashboard: React.FC = () => {
     { name: 'Parapharmacie', href: '/pharmacist/parapharmacy', icon: Sparkles },
     { name: 'Commandes', href: '/pharmacist/orders', icon: ShoppingCart },
     { name: 'Promotions', href: '/pharmacist/promotions', icon: Percent },
+    { name: 'Offres spéciales', href: '/pharmacist/offers', icon: Tag },
     { name: 'Analytiques', href: '/pharmacist/analytics', icon: TrendingUp },
     { name: 'Profil', href: '/pharmacist/profile', icon: User },
   ];
@@ -91,7 +93,7 @@ const PharmacistDashboard: React.FC = () => {
 
       {/* Mobile navigation */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t z-10">
-        <div className="grid grid-cols-6 gap-1">
+        <div className="grid grid-cols-7 gap-1">
           {navigation.map((item) => {
             const isActive = location.pathname === item.href;
             return (
@@ -120,6 +122,8 @@ const PharmacistDashboard: React.FC = () => {
                 <Route path="parapharmacy" element={<Parapharmacy />} />
                 <Route path="orders" element={<Orders />} />
                 <Route path="promotions" element={<Promotions />} />
+                <Route path="offers" element={<SpecialOffers />} />
+                <Route path="offers/:id" element={<SpecialOffers />} />
                 <Route path="analytics" element={<Analytics />} />
                 <Route path="profile" element={<Profile />} />
               </Routes>

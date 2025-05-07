@@ -28,10 +28,39 @@ serve(async (req) => {
       throw new Error('Missing required fields: to, subject, or content')
     }
 
+    // Create HTML version of the email with proper formatting
+    let htmlContent = content
+      .replace(/\n/g, '<br/>')
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.*?)\*/g, '<em>$1</em>');
+    
+    // Format lists
+    if (htmlContent.includes('Liste des produits :')) {
+      htmlContent = htmlContent.replace(/Liste des produits :(.*?)(?=<br\/><br\/>|$)/s, (match, productsList) => {
+        // Format the products list as an HTML list
+        const formattedList = productsList
+          .replace(/<br\/>/g, '')
+          .split('-')
+          .filter(item => item.trim())
+          .map(line => `<li>${line.trim()}</li>`)
+          .join('');
+        
+        return `<h3>Liste des produits :</h3><ul style="margin-top: 10px; margin-bottom: 10px;">${formattedList}</ul>`;
+      });
+    }
+    
+    // Add some styling
+    htmlContent = `
+      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        ${htmlContent}
+      </div>
+    `;
+
     const result = await resend.emails.send({
       from: 'PharmaConnect <noreply@pharmaconnect-dz.com>',
       to: [to],
       subject,
+      html: htmlContent,
       text: content,
     })
 

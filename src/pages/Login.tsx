@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { LogIn, Mail, CheckCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -12,11 +12,19 @@ export function Login() {
   const [loading, setLoading] = useState(false);
   const [showResetPassword, setShowResetPassword] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
   const { signIn, user } = useAuth();
 
   useEffect(() => {
     if (user) {
-      navigate(`/${user.role}`);
+      // Check if there's a redirect URL in localStorage
+      const redirectUrl = localStorage.getItem('redirectAfterLogin');
+      if (redirectUrl) {
+        localStorage.removeItem('redirectAfterLogin');
+        navigate(redirectUrl);
+      } else {
+        navigate(`/${user.role}`);
+      }
     }
   }, [user, navigate]);
 

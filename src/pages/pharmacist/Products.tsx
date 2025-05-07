@@ -1,14 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { Search, Filter, Loader2, ShoppingCart, X } from 'lucide-react';
+import { Search, Filter, Loader2, ShoppingCart, X, Tag } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import Select from 'react-select';
 import { customStyles, selectComponents } from '../../components/VirtualizedSelect';
-import type { Medication, WholesalerInventory } from '../../types/supabase';
+import type { Medication, WholesalerInventory, ActiveOffer } from '../../types/supabase';
 import { algerianWilayas } from '../../lib/wilayas';
 import { sendOrderNotification } from '../../lib/notifications';
 import { ProductTypeNav } from '../../components/ProductTypeNav';
 import { UserLink } from '../../components/UserLink';
+import { Link } from 'react-router-dom';
 
 type MedicationWithInventory = Medication & {
   wholesaler_inventory: (WholesalerInventory & {
@@ -18,6 +19,16 @@ type MedicationWithInventory = Medication & {
       email: string;
     };
   })[];
+  offers?: {
+    id: string;
+    name: string;
+    type: 'pack' | 'threshold';
+  }[];
+  isPriorityInOffers?: {
+    id: string;
+    name: string;
+    type: 'pack' | 'threshold';
+  }[];
 };
 
 type OrderModalProps = {
@@ -218,10 +229,12 @@ export function Products() {
     price: 0
   });
   const [orderLoading, setOrderLoading] = useState(false);
+  const [offers, setOffers] = useState<ActiveOffer[]>([]);
 
   useEffect(() => {
     if (user?.id) {
       fetchMedications();
+      fetchOffers();
     }
   }, [user?.id]);
 
@@ -234,6 +247,20 @@ export function Products() {
 
     return () => clearTimeout(debounceTimer);
   }, [searchQuery, selectedWilaya]);
+
+  async function fetchOffers() {
+    try {
+      const { data, error } = await supabase
+        .from('active_offers_view')
+        .select('*');
+      
+      if (error) throw error;
+      
+      setOffers(data || []);
+    } catch (error) {
+      console.error('Error fetching offers:', error);
+    }
+  }
 
   async function fetchMedications() {
     try {
@@ -284,8 +311,35 @@ export function Products() {
         };
       });
 
+      // Enhance medications with offer information
+      const enhancedMeds = filteredMeds.map(med => {
+        // Check if medication is in any offer
+        const inOffers = offers.filter(offer => 
+          offer.products.some(p => !p.is_priority && p.medication_id === med.id)
+        ).map(offer => ({
+          id: offer.id,
+          name: offer.name,
+          type: offer.type
+        }));
+        
+        // Check if medication is a priority product in any offer
+        const isPriorityIn = offers.filter(offer => 
+          offer.products.some(p => p.is_priority && p.medication_id === med.id)
+        ).map(offer => ({
+          id: offer.id,
+          name: offer.name,
+          type: offer.type
+        }));
+        
+        return {
+          ...med,
+          offers: inOffers.length > 0 ? inOffers : undefined,
+          isPriorityInOffers: isPriorityIn.length > 0 ? isPriorityIn : undefined
+        };
+      });
+
       setPromotionsMap(newPromotionsMap);
-      setMedications(filteredMeds);
+      setMedications(enhancedMeds);
     } catch (error) {
       console.error('Error fetching medications:', error);
     } finally {
@@ -401,12 +455,36 @@ export function Products() {
               <li key={medication.id} className="p-6">
                 <div className="flex flex-col space-y-4">
                   <div className="bg-gray-50 p-4 rounded-lg">
-                    <h3 className="text-lg font-semibold text-gray-900">
-                      {medication.commercial_name}
-                    </h3>
-                    <p className="text-sm text-gray-600">
-                      {medication.scientific_name}
-                    </p>
+                    <div className="flex justify-between">
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-900">
+                          {medication.commercial_name}
+                        </h3>
+                        <p className="text-sm text-gray-600">
+                          {medication.scientific_name}
+                        </p>
+                      </div>
+                      <div className="flex flex-col space-y-2">
+                        {medication.offers && medication.offers.length > 0 && (
+                          <Link
+                            to={`/pharmacist/offers/${medication.offers[0].id}`}
+                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 hover:bg-blue-200"
+                          >
+                            <Tag className="h-3 w-3 mr-1" />
+                            Inclus dans une offre
+                          </Link>
+                        )}
+                        {medication.isPriorityInOffers && medication.isPriorityInOffers.length > 0 && (
+                          <Link
+                            to={`/pharmacist/offers/${medication.isPriorityInOffers[0].id}`}
+                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 hover:bg-green-200"
+                          >
+                            <Tag className="h-3 w-3 mr-1" />
+                            Accès prioritaire disponible
+                          </Link>
+                        )}
+                      </div>
+                    </div>
                     <div className="mt-2 grid grid-cols-2 md:grid-cols-4 gap-4">
                       <div>
                         <span className="text-sm font-medium text-gray-500">Forme :</span>

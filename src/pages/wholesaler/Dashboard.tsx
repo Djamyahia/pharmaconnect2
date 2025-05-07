@@ -1,6 +1,6 @@
 import React from "react";
 import { Routes, Route, Link, useLocation } from "react-router-dom";
-import { Package, ShoppingCart, Percent, User, TrendingUp, Sparkles, Clock } from "lucide-react";
+import { Package, ShoppingCart, Percent, User, TrendingUp, Sparkles, Clock, Tag } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { Inventory } from "./Inventory";
 import { Orders } from "./Orders";
@@ -9,6 +9,8 @@ import { Analytics } from "./Analytics";
 import { Profile } from "../shared/Profile";
 import { Parapharmacy } from "./Parapharmacy";
 import { DailyActions } from "./DailyActions";
+import { PromotionalOffers } from "./PromotionalOffers";
+import { PackManagement } from "./PackManagement";
 
 const WholesalerDashboard: React.FC = () => {
   const location = useLocation();
@@ -20,6 +22,8 @@ const WholesalerDashboard: React.FC = () => {
     { name: 'Parapharmacie', href: '/wholesaler/parapharmacy', icon: Sparkles },
     { name: 'Commandes', href: '/wholesaler/orders', icon: ShoppingCart },
     { name: 'Promotions', href: '/wholesaler/promotions', icon: Percent },
+    { name: 'Offres spéciales', href: '/wholesaler/offers', icon: Tag },
+    { name: 'Packs', href: '/wholesaler/packs', icon: Package },
     { name: 'Analytiques', href: '/wholesaler/analytics', icon: TrendingUp },
     { name: 'Profil', href: '/wholesaler/profile', icon: User },
   ];
@@ -93,7 +97,7 @@ const WholesalerDashboard: React.FC = () => {
 
       {/* Mobile navigation */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t z-10">
-        <div className="grid grid-cols-7 gap-1">
+        <div className="grid grid-cols-9 gap-1">
           {navigation.map((item) => {
             const isActive = location.pathname === item.href;
             return (
@@ -123,6 +127,8 @@ const WholesalerDashboard: React.FC = () => {
                 <Route path="parapharmacy" element={<Parapharmacy />} />
                 <Route path="orders" element={<Orders />} />
                 <Route path="promotions" element={<Promotions />} />
+                <Route path="offers" element={<PromotionalOffers />} />
+                <Route path="packs" element={<PackManagement />} />
                 <Route path="analytics" element={<Analytics />} />
                 <Route path="profile" element={<Profile />} />
               </Routes>

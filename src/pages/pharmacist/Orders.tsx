@@ -17,7 +17,17 @@ type ExtendedOrder = Order & {
       form: string;
       dosage: string;
     } | null;
+    product?: {
+      name: string;
+      brand: string;
+    } | null;
   })[];
+  offer_details?: {
+    offer_name: string;
+    offer_type: 'pack' | 'threshold';
+    min_purchase_amount?: number;
+    free_text_products?: string;
+  };
 };
 
 export function Orders() {
@@ -49,6 +59,10 @@ export function Orders() {
               scientific_name,
               form,
               dosage
+            ),
+            product:parapharmacy_products (
+              name,
+              brand
             )
           )
         `)
@@ -61,7 +75,34 @@ export function Orders() {
       const { data, error } = await query;
 
       if (error) throw error;
-      setOrders(data || []);
+      
+      // Process orders to identify pack/threshold offers
+      const processedOrders = (data || []).map(order => {
+        // Check if this is a pack order by looking at metadata or patterns
+        const isPackOrder = order.order_items.length > 1;
+        
+        // For threshold orders, check if there's a minimum purchase amount
+        const isThresholdOrder = order.metadata && order.metadata.min_purchase_amount;
+        
+        // Extract offer details if available
+        let offerDetails = undefined;
+        
+        if (isPackOrder || isThresholdOrder) {
+          offerDetails = {
+            offer_name: order.metadata?.offer_name || "Pack de produits",
+            offer_type: isThresholdOrder ? 'threshold' : 'pack',
+            min_purchase_amount: order.metadata?.min_purchase_amount,
+            free_text_products: order.metadata?.free_text_products
+          };
+        }
+        
+        return {
+          ...order,
+          offer_details: offerDetails
+        };
+      });
+      
+      setOrders(processedOrders);
     } catch (error) {
       console.error('Erreur lors de la récupération des commandes:', error);
     } finally {
@@ -205,7 +246,7 @@ export function Orders() {
         <div className="bg-white shadow rounded-lg overflow-hidden">
           <ul className="divide-y divide-gray-200">
             {orders.map((order) => (
-              <li key={order.id} className="p-4">
+              <li key={order.id} className={`p-4 ${order.status === 'pending' ? 'bg-red-50' : ''}`}>
                 <div className="cursor-pointer" onClick={() => toggleOrderExpansion(order.id)}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-4">
@@ -217,6 +258,11 @@ export function Orders() {
                         <p className="text-sm text-gray-500">
                           {formatDate(order.created_at)}
                         </p>
+                        {order.offer_details && (
+                          <p className="text-sm text-indigo-600">
+                            {order.offer_details.offer_name} - {order.offer_details.offer_type === 'pack' ? 'Pack groupé' : 'Achats libres'}
+                          </p>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center space-x-4">
@@ -255,11 +301,29 @@ export function Orders() {
                       </div>
                     </div>
 
+                    {/* Special display for threshold offers */}
+                    {order.offer_details?.offer_type === 'threshold' && order.offer_details.min_purchase_amount && (
+                      <div className="bg-amber-50 p-4 rounded-lg mb-4">
+                        <h4 className="text-sm font-medium text-amber-800 mb-2">Offre sur achats libres</h4>
+                        <p className="text-sm text-amber-700">
+                          Montant minimum d'achat : {order.offer_details.min_purchase_amount.toFixed(2)} DZD
+                        </p>
+                        {order.offer_details.free_text_products && (
+                          <div className="mt-2">
+                            <p className="text-sm font-medium text-amber-800">Produits demandés :</p>
+                            <p className="text-sm text-amber-700 whitespace-pre-line">
+                              {order.offer_details.free_text_products}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     <table className="min-w-full divide-y divide-gray-200">
                       <thead>
                         <tr>
                           <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Médicament
+                            Produit
                           </th>
                           <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Détails
@@ -279,10 +343,15 @@ export function Orders() {
                         {order.order_items.map((item) => (
                           <tr key={item.id}>
                             <td className="px-4 py-2 text-sm text-gray-900">
-                              {item.medications?.commercial_name || 'N/A'}
+                              {item.medications?.commercial_name || item.product?.name || 'N/A'}
                             </td>
                             <td className="px-4 py-2 text-sm text-gray-500">
-                              {item.medications ? `${item.medications.form} - ${item.medications.dosage}` : 'N/A'}
+                              {item.medications ? 
+                                `${item.medications.form} - ${item.medications.dosage}` : 
+                                item.product ? 
+                                  `${item.product.brand || ''}` : 
+                                  'N/A'
+                              }
                             </td>
                             <td className="px-4 py-2 text-sm text-gray-900 text-right">
                               {item.quantity}
@@ -305,6 +374,13 @@ export function Orders() {
                             {order.total_amount.toFixed(2)} DZD
                           </td>
                         </tr>
+                        {order.offer_details?.offer_type === 'threshold' && order.offer_details.min_purchase_amount && (
+                          <tr>
+                            <td colSpan={5} className="px-4 py-2 text-xs text-amber-600 text-right">
+                              Ce montant inclut le minimum d'achat requis de {order.offer_details.min_purchase_amount.toFixed(2)} DZD
+                            </td>
+                          </tr>
+                        )}
                       </tfoot>
                     </table>
 

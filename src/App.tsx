@@ -10,6 +10,8 @@ import PharmacistDashboard from './pages/pharmacist/Dashboard';
 import WholesalerDashboard from './pages/wholesaler/Dashboard';
 import AdminDashboard from './pages/admin/Dashboard';
 import { Home } from './pages/Home';
+import { PublicOffers } from './pages/PublicOffers';
+import { OfferDetails } from './pages/OfferDetails';
 import { useAuth } from './contexts/AuthContext';
 
 function DashboardRedirect() {
@@ -45,6 +47,8 @@ function App() {
             <Route path="register" element={<Register />} />
             <Route path="verify-email" element={<VerifyEmail />} />
             <Route path="update-password" element={<UpdatePassword />} />
+            <Route path="offers" element={<PublicOffers />} />
+            <Route path="offers/:id" element={<OfferDetails />} />
             <Route path="pharmacist/*" element={<PharmacistDashboard />} />
             <Route path="wholesaler/*" element={<WholesalerDashboard />} />
             <Route path="admin/*" element={<AdminDashboard />} />

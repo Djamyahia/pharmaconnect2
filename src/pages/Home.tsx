@@ -19,7 +19,8 @@ import {
   Percent,
   Lock,
   UserCheck,
-  Clock
+  Clock,
+  Tag
 } from 'lucide-react';
 
 const FadeInWhenVisible = ({ children }: { children: React.ReactNode }) => {
@@ -109,10 +110,11 @@ export function Home() {
                 whileTap={{ scale: 0.95 }}
               >
                 <Link
-                  to="/login"
+                  to="/offers"
                   className="inline-flex items-center justify-center px-8 py-4 text-lg font-medium rounded-full text-indigo-600 bg-white border-2 border-indigo-600 hover:bg-indigo-50 transform transition-all duration-200"
                 >
-                  Se connecter
+                  <Tag className="h-5 w-5 mr-2" />
+                  Découvrir les offres
                 </Link>
               </motion.div>
             </div>
@@ -262,17 +264,31 @@ export function Home() {
             <p className="text-xl text-indigo-200 mb-12">
               Créez votre compte gratuitement et commencez à optimiser votre activité.
             </p>
-            <motion.div
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              <Link
-                to="/register"
-                className="inline-flex items-center justify-center px-8 py-4 text-lg font-medium rounded-full text-indigo-600 bg-white hover:bg-indigo-50 transform transition-all duration-200"
+            <div className="flex flex-col sm:flex-row justify-center gap-4">
+              <motion.div
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
               >
-                Commencer gratuitement
-              </Link>
-            </motion.div>
+                <Link
+                  to="/register"
+                  className="inline-flex items-center justify-center px-8 py-4 text-lg font-medium rounded-full text-indigo-600 bg-white hover:bg-indigo-50 transform transition-all duration-200"
+                >
+                  Commencer gratuitement
+                </Link>
+              </motion.div>
+              <motion.div
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <Link
+                  to="/offers"
+                  className="inline-flex items-center justify-center px-8 py-4 text-lg font-medium rounded-full text-white bg-transparent border-2 border-white hover:bg-white/10 transform transition-all duration-200"
+                >
+                  <Tag className="h-5 w-5 mr-2" />
+                  Voir les offres
+                </Link>
+              </motion.div>
+            </div>
           </div>
         </div>
       </FadeInWhenVisible>
