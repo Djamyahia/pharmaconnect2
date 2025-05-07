@@ -8,11 +8,26 @@ export default defineConfig({
   },
   server: {
     port: 5173,
-    strictPort: true,
-    historyApiFallback: true,
+    strictPort: false,
+    fs: {
+      strict: true,
+    },
   },
   preview: {
     port: 5173,
-    strictPort: true,
+    strictPort: false,
   },
+  build: {
+    outDir: 'dist',
+    assetsDir: 'assets',
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom', 'react-router-dom'],
+        },
+      },
+    },
+  },
+  appType: 'spa',
+  base: '/',
 });
