@@ -24,7 +24,7 @@ export function Layout() {
                   className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-500 hover:text-indigo-600 hover:border-indigo-300"
                 >
                   <Tag className="h-4 w-4 mr-1" />
-                  Offres promotionnelles
+                  Packs Publics
                 </Link>
               </div>
             </div>
@@ -91,7 +91,7 @@ export function Layout() {
               className="block px-4 py-2 text-base font-medium text-gray-700 hover:text-indigo-600 hover:bg-gray-50"
               onClick={() => setMobileMenuOpen(false)}
             >
-              Offres promotionnelles
+              Packs Publics
             </Link>
             
             {user ? (
