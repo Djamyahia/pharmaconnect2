@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 
+
 type EmailTemplate = {
   subject: string;
   content: string;
@@ -124,10 +125,38 @@ export async function sendOrderNotification(
           return null;
         }).filter(Boolean);
 
-        // Create a formatted product list for the email
-        const productsList = processedItems
-          .map(item => `- ${item.name}${item.form ? ` - ${item.form}` : ''}${item.dosage ? ` ${item.dosage}` : ''} (${item.quantity} unités à ${item.unit_price.toFixed(2)} DZD = ${(item.quantity * item.unit_price).toFixed(2)} DZD)`)
-          .join('\n');
+        // dans sendOrderNotification, au moment de créer productsList :
+const NBSP = '\u00A0';   // espace insécable
+const NBHY = '\u2011';   // tiret insécable
+const SEP  = `${NBSP}${NBHY}${NBSP}`; // " - "
+
+// … puis :
+const productsList = processedItems
+  .map(item => {
+    // 1) remplacez tous les "-" normaux par des non-breaking hyphens
+    const safeName   = item.name?.replace(/-/g, NBHY)   || '';
+    const safeForm   = item.form?.replace(/-/g, NBHY)   || '';
+    const safeDosage = item.dosage?.replace(/-/g, NBHY) || '';
+
+    // 2) construisez la ligne en collant nom, forme et dosage
+    let line = `-${NBSP}${safeName}`;      // "- NomProduit"
+
+    if (safeForm) {
+      line += `${SEP}${safeForm}`;         // " - Forme"
+    }
+    if (safeDosage) {
+      line += `${SEP}${safeDosage}`;       // " - Dosage"
+    }
+
+    // 3) ajoutez la partie entre parenthèses
+    line += ` (${item.quantity} unités à ${item.unit_price.toFixed(2)} DZD = `
+         + `${(item.quantity * item.unit_price).toFixed(2)} DZD)`;
+
+    return line;
+  })
+  .join('\n');
+
+
 
         replacements.products_list = productsList;
       }
