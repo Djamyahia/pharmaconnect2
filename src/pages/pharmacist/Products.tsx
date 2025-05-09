@@ -344,66 +344,73 @@ export function Products() {
     }
   }
 
-  async function createOrder(medication: MedicationWithInventory, inventory: WholesalerInventory & { users: { company_name: string; wilaya: string; email: string } }, quantity: number) {
-    if (!user?.id) {
-      alert('Veuillez vous connecter pour passer des commandes.');
-      return;
-    }
+  async function createOrder(
+  medication: MedicationWithInventory,
+  inventory: WholesalerInventory & { users: { company_name: string; wilaya: string; email: string } },
+  quantity: number
+) {
+  if (!user?.id) {
+    alert('Veuillez vous connecter pour passer des commandes.');
+    return;
+  }
+
+  try {
+    setOrderLoading(true);
+
+    const { data: orderData, error: orderError } = await supabase
+      .from('orders')
+      .insert({
+        pharmacist_id: user.id,
+        wholesaler_id: inventory.wholesaler_id,
+        total_amount: inventory.price * quantity,
+        status: 'pending'
+      })
+      .select()
+      .single();
+
+    if (orderError) throw orderError;
+
+    const { error: itemError } = await supabase
+      .from('order_items')
+      .insert({
+        order_id: orderData.id,
+        medication_id: medication.id,
+        quantity: quantity,
+        unit_price: inventory.price
+      });
+
+    if (itemError) throw itemError;
 
     try {
-      setOrderLoading(true);
-
-      const { data: orderData, error: orderError } = await supabase
-        .from('orders')
-        .insert({
-          pharmacist_id: user.id,
-          wholesaler_id: inventory.wholesaler_id,
-          total_amount: inventory.price * quantity,
-          status: 'pending'
-        })
-        .select()
-        .single();
-
-      if (orderError) throw orderError;
-
-      const { error: itemError } = await supabase
-        .from('order_items')
-        .insert({
+      await sendOrderNotification(
+        'order_placed',
+        inventory.users.email,
+        {
+          wholesaler_name: inventory.users.company_name,
+          pharmacist_name: user.company_name,
           order_id: orderData.id,
-          medication_id: medication.id,
-          quantity: quantity,
-          unit_price: inventory.price
-        });
-
-      if (itemError) throw itemError;
-
-      try {
-        const freeUnits = Math.floor(paidQty * promotion.free_units_percentage/100);
-        await sendOrderNotification(
-          'order_placed',
-          inventory.users.email,
-          {
-            wholesaler_name: inventory.users.company_name,
-            pharmacist_name: user.company_name,
-            order_id: orderData.id,
-            total_amount: `${(inventory.price * quantity).toFixed(2)} DZD`,
-            free_units_percentage:    promotion.free_units_percentage.toString(),
-            free_units_count:         freeUnits.toString()
-          }
-        );
-      } catch (emailError) {
-        console.error('Failed to send email notification:', emailError);
-      }
-
-      alert('Commande créée avec succès !');
-      setOrderModal({ show: false, medication: null, inventory: null, price: 0 });
-    } catch (error) {
-      console.error('Error creating order:', error);
-      alert('Échec de la création de la commande. Veuillez réessayer.');
-    } finally {
-      setOrderLoading(false);
+          product_name: medication.commercial_name,
+          product_form: medication.form,
+          product_dosage: medication.dosage,
+          quantity: `${quantity}`,
+          unit_price: `${inventory.price}`,
+          total_amount: `${(inventory.price * quantity).toFixed(2)} DZD`
+        }
+      );
+    } catch (emailError) {
+      console.error('Failed to send email notification:', emailError);
     }
+
+    alert('Commande créée avec succès !');
+    setOrderModal({ show: false, medication: null, inventory: null, price: 0 });
+  } catch (error) {
+    console.error('Error creating order:', error);
+    alert('Échec de la création de la commande. Veuillez réessayer.');
+  } finally {
+    setOrderLoading(false);
   }
+}
+
 
   if (loading) {
     return (
