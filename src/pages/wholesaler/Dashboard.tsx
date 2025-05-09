@@ -1,6 +1,6 @@
 import React from "react";
 import { Routes, Route, Link, useLocation } from "react-router-dom";
-import { Package, ShoppingCart, Percent, User, TrendingUp, Sparkles, Clock, Tag } from "lucide-react";
+import { Package, ShoppingCart, Percent, User, TrendingUp, Sparkles, Clock, Tag, Pill } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { Inventory } from "./Inventory";
 import { Orders } from "./Orders";
@@ -17,10 +17,10 @@ const WholesalerDashboard: React.FC = () => {
 
   const navigation = [
     { name: 'Actions du jour', href: '/wholesaler/daily', icon: Clock },
-    { name: 'Pharmacie', href: '/wholesaler/inventory', icon: Package },
+    { name: 'Pharmacie', href: '/wholesaler/inventory', icon: Pill },
     { name: 'Parapharmacie', href: '/wholesaler/parapharmacy', icon: Sparkles },
     { name: 'Commandes', href: '/wholesaler/orders', icon: ShoppingCart },
-    { name: 'Promotions', href: '/wholesaler/promotions', icon: Percent },
+    { name: 'Promotions (UG)', href: '/wholesaler/promotions', icon: Percent },
     { name: 'Packs', href: '/wholesaler/packs', icon: Package },
     { name: 'Analytiques', href: '/wholesaler/analytics', icon: TrendingUp },
     { name: 'Profil', href: '/wholesaler/profile', icon: User },
