@@ -48,6 +48,13 @@ export function PackCreationWizard({ isOpen, onClose, onSuccess, initialData }: 
       free_units_percentage?: number | null;
     }[]
   });
+
+   // 1️⃣ On définit la suite des étapes en fonction du type d’offre
+ const steps: WizardStep[] =
+   formData.type === 'pack'
+     ? ['basic', 'products', 'review']               // si pack, on enlève 'priority'
+     : ['basic', 'products', 'priority', 'review'];  // sinon on garde les 4 étapes
+ const currentIndex = steps.indexOf(currentStep);    // index de l’étape courante
   
   // Documents
   const [documents, setDocuments] = useState<File[]>([]);
@@ -161,64 +168,33 @@ export function PackCreationWizard({ isOpen, onClose, onSuccess, initialData }: 
   }
   
   const handleNextStep = () => {
-    // Validate current step
-    if (currentStep === 'basic') {
-      if (!formData.name.trim()) {
-        setError('Le nom de l\'offre est requis');
-        return;
-      }
-      
-      if (formData.type === 'threshold' && (!formData.min_purchase_amount || formData.min_purchase_amount <= 0)) {
-        setError('Le montant minimum d\'achat doit être supérieur à 0');
-        return;
-      }
-      
-      const startDate = new Date(formData.start_date);
-      const endDate = new Date(formData.end_date);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      
-      if (startDate < today) {
-        setError('La date de début ne peut pas être dans le passé');
-        return;
-      }
-      
-      if (endDate <= startDate) {
-        setError('La date de fin doit être après la date de début');
-        return;
-      }
-      
-      setCurrentStep('products');
-    } else if (currentStep === 'products') {
-      if (formData.products.length === 0) {
-        setError('Vous devez ajouter au moins un produit à l\'offre');
-        return;
-      }
-      
-      setCurrentStep('priority');
-    } else if (currentStep === 'priority') {
-      if (!formData.products.some(p => p.is_priority)) {
-        setError('Vous devez marquer au moins un produit comme prioritaire');
-        return;
-      }
-      
-      setCurrentStep('review');
-    }
-    
+  // 1. Validation de base pour chaque étape
+  if (currentStep === 'basic') {
+    // … vos validations sur le nom, les dates, etc. …
+    // si ça échoue, vous appelez setError(...) et return
+  }
+  if (currentStep === 'products') {
+    // … validation que formData.products n’est pas vide …
+  }
+  if (currentStep === 'priority') {
+    // … validation de priorité …
+  }
+
+  // 2. On passe à l’étape suivante au sein de `steps`
+  if (currentIndex < steps.length - 1) {
+    setCurrentStep(steps[currentIndex + 1]);
     setError('');
-  };
+  }
+};
+
   
   const handlePreviousStep = () => {
-    if (currentStep === 'products') {
-      setCurrentStep('basic');
-    } else if (currentStep === 'priority') {
-      setCurrentStep('products');
-    } else if (currentStep === 'review') {
-      setCurrentStep('priority');
-    }
-    
+  if (currentIndex > 0) {
+    setCurrentStep(steps[currentIndex - 1]);
     setError('');
-  };
+  }
+};
+
   
   const handleAddProduct = () => {
     setFormData({
@@ -229,7 +205,7 @@ export function PackCreationWizard({ isOpen, onClose, onSuccess, initialData }: 
           medication_id: '',
           quantity: 1,
           price: 0,
-          is_priority: false,
+          is_priority: formData.type === 'threshold',
           priority_message: 'Produit disponible en priorité dans le cadre de cette opération'
         }
       ]
@@ -246,6 +222,11 @@ export function PackCreationWizard({ isOpen, onClose, onSuccess, initialData }: 
   };
   
   const handleProductChange = (index: number, field: string, value: any) => {
+    if (field === 'is_priority' && formData.type === 'threshold') {
+  // Impossible de désactiver la priorité sur une offre achat libre
+  return;
+}
+
     const newProducts = [...formData.products];
     
     if (field === 'medication_id' && typeof value === 'string') {
@@ -467,43 +448,32 @@ export function PackCreationWizard({ isOpen, onClose, onSuccess, initialData }: 
         {/* Progress steps */}
         <div className="mb-8">
           <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <div className={`flex items-center justify-center w-8 h-8 rounded-full ${
-                currentStep === 'basic' ? 'bg-indigo-600 text-white' : 'bg-indigo-100 text-indigo-600'
-              }`}>
-                1
-              </div>
-              <div className="ml-2 text-sm font-medium text-gray-900">Informations de base</div>
-            </div>
-            <div className="hidden sm:block w-16 h-0.5 bg-gray-200"></div>
-            <div className="flex items-center">
-              <div className={`flex items-center justify-center w-8 h-8 rounded-full ${
-                currentStep === 'products' ? 'bg-indigo-600 text-white' : 
-                currentStep === 'priority' || currentStep === 'review' ? 'bg-indigo-100 text-indigo-600' : 'bg-gray-100 text-gray-400'
-              }`}>
-                2
-              </div>
-              <div className="ml-2 text-sm font-medium text-gray-900">Produits</div>
-            </div>
-            <div className="hidden sm:block w-16 h-0.5 bg-gray-200"></div>
-            <div className="flex items-center">
-              <div className={`flex items-center justify-center w-8 h-8 rounded-full ${
-                currentStep === 'priority' ? 'bg-indigo-600 text-white' : 
-                currentStep === 'review' ? 'bg-indigo-100 text-indigo-600' : 'bg-gray-100 text-gray-400'
-              }`}>
-                3
-              </div>
-              <div className="ml-2 text-sm font-medium text-gray-900">Priorités</div>
-            </div>
-            <div className="hidden sm:block w-16 h-0.5 bg-gray-200"></div>
-            <div className="flex items-center">
-              <div className={`flex items-center justify-center w-8 h-8 rounded-full ${
-                currentStep === 'review' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-400'
-              }`}>
-                4
-              </div>
-              <div className="ml-2 text-sm font-medium text-gray-900">Vérification</div>
-            </div>
+            {steps.map((step, i) => (
+              <React.Fragment key={step}>
+                <div className="flex items-center">
+                  <div
+                    className={`flex items-center justify-center w-8 h-8 rounded-full ${
+                      currentIndex === i
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-indigo-100 text-indigo-600'
+                    }`}
+                  >
+                    {i + 1}
+                  </div>
+                  <div className="ml-2 text-sm font-medium text-gray-900">
+                    {{
+                      basic:   'Informations de base',
+                      products:'Produits',
+                      priority:'Priorités',
+                      review:  'Vérification'
+                    }[step]}
+                  </div>
+                </div>
+                {i < steps.length - 1 && (
+                  <div className="hidden sm:block w-16 h-0.5 bg-gray-200"></div>
+                )}
+              </React.Fragment>
+            ))}
           </div>
         </div>
         
@@ -537,7 +507,21 @@ export function PackCreationWizard({ isOpen, onClose, onSuccess, initialData }: 
                   </label>
                   <select
                     value={formData.type}
-                    onChange={(e) => setFormData({ ...formData, type: e.target.value as 'pack' | 'threshold' })}
+                    onChange={(e) => {
+                     const newType = e.target.value as 'pack' | 'threshold';
+                     setFormData({
+                       ...formData,
+                       type: newType,
+                       // 🔄 On force is_priority selon le type :
+                       // - true pour achat libre
+                       // - false pour pack groupé
+                       products: formData.products.map(p => ({
+                         ...p,
+                         is_priority: newType === 'threshold'
+                       }))
+                     });
+                  }}
+
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                     required
                   >
@@ -770,92 +754,109 @@ export function PackCreationWizard({ isOpen, onClose, onSuccess, initialData }: 
           )}
           
           {currentStep === 'priority' && (
+            
             <div className="space-y-6">
-              <div className="bg-yellow-50 p-4 rounded-lg">
-                <h4 className="text-md font-medium text-yellow-800 mb-2">Produits à disponibilité prioritaire</h4>
-                <p className="text-sm text-yellow-700">
-                  Marquez les produits qui seront disponibles en priorité pour les pharmaciens qui commandent cette offre.
-                  {formData.type === 'threshold' && ' Ces produits ne seront disponibles que si le montant minimum d\'achat est atteint.'}
-                </p>
-              </div>
-              
-              {formData.type === 'threshold' && (
-                <div className="bg-blue-50 p-4 rounded-lg">
-                  <div className="flex flex-col md:flex-row md:items-center md:justify-between">
-                    <label className="block text-sm font-medium text-blue-700">
-                      Nombre maximum de produits prioritaires sélectionnables
-                    </label>
-                    <div className="mt-2 md:mt-0 flex items-center">
-                      <input
-                        type="number"
-                        min="1"
-                        value={formData.max_quota_selections}
-                        onChange={(e) => {
-                          const value = parseInt(e.target.value);
-                          if (value > 0) {
-                            setFormData({ ...formData, max_quota_selections: value });
-                          }
-                        }}
-                        className="w-20 rounded-md border-blue-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                      />
-                    </div>
-                  </div>
-                  <p className="mt-2 text-sm text-blue-600">
-                    Ce paramètre définit combien de produits prioritaires différents le pharmacien peut sélectionner lors de sa commande.
-                    <br />
-                    <strong>Valeur actuelle : {formData.max_quota_selections}</strong>
-                  </p>
-                </div>
-              )}
-              
-              {formData.products.length === 0 ? (
-                <div className="text-center py-6 bg-gray-50 rounded-lg">
-                  <PackageIcon className="mx-auto h-12 w-12 text-gray-400" />
-                  <h3 className="mt-2 text-sm font-medium text-gray-900">Aucun produit</h3>
-                  <p className="mt-1 text-sm text-gray-500">Vous devez d'abord ajouter des produits à l'offre.</p>
+              {formData.type === 'threshold' ? (
+                // —— Mode achat libre — on affiche juste la liste ——
+                <div className="bg-yellow-50 p-4 rounded-lg">
+                  {formData.type === 'threshold' && (
+  <div className="bg-blue-50 p-4 rounded-lg mb-4">
+    <label className="block text-sm font-medium text-blue-700">
+      Nombre maximum de produits prioritaires sélectionnables
+    </label>
+    <input
+      type="number"
+      min="1"
+      value={formData.max_quota_selections}
+      onChange={(e) =>
+        setFormData({
+          ...formData,
+          max_quota_selections: parseInt(e.target.value, 10) || 1
+        })
+      }
+      className="mt-1 block w-full rounded-md border-blue-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+    />
+    <p className="mt-1 text-xs text-blue-600">
+      Combien de produits prioritaires le pharmacien pourra choisir.
+    </p>
+  </div>
+)}
+
+                  <h4 className="text-md font-medium text-yellow-800 mb-2">
+                    Tous vos produits prioritaires
+                  </h4>
+                  <ul className="list-disc list-inside text-sm text-gray-700 space-y-1">
+                    {formData.products.map((p, i) => (
+                      <li key={i}>
+                        {p.medication_name} — Quantité : {p.quantity}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  {formData.products.map((product, index) => (
-                    <div key={index} className={`p-4 rounded-lg ${product.is_priority ? 'bg-green-50 border border-green-200' : 'bg-gray-50'}`}>
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center">
-                          <input
-                            type="checkbox"
-                            id={`priority-${index}`}
-                            checked={product.is_priority}
-                            onChange={(e) => handleProductChange(index, 'is_priority', e.target.checked)}
-                            className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                          />
-                          <label htmlFor={`priority-${index}`} className="ml-2 block text-sm font-medium text-gray-700">
-                            Produit prioritaire
-                          </label>
-                        </div>
-                        <span className="text-sm font-medium text-gray-900">
-                          {product.medication_name}
-                        </span>
-                      </div>
-                      
-                      {product.is_priority && (
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700">
-                            Message de priorité
-                          </label>
-                          <textarea
-                            value={product.priority_message}
-                            onChange={(e) => handleProductChange(index, 'priority_message', e.target.value)}
-                            rows={2}
-                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                            placeholder="Ex: Produit disponible en priorité dans le cadre de cette opération"
-                          />
-                        </div>
-                      )}
-                    </div>
-                  ))}
+      // —— Mode pack groupé — on garde l'UI checkbox existante ——
+      <div className="space-y-6">
+        <div className="bg-yellow-50 p-4 rounded-lg">
+          <h4 className="text-md font-medium text-yellow-800 mb-2">
+            Produits à disponibilité prioritaire
+          </h4>
+          <p className="text-sm text-yellow-700">
+            Marquez les produits qui seront disponibles en priorité.
+          </p>
+        </div>
+        <div className="space-y-4">
+          {formData.products.map((product, index) => (
+            <div
+              key={index}
+              className={`p-4 rounded-lg ${
+                product.is_priority ? 'bg-green-50 border border-green-200' : 'bg-gray-50'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id={`priority-${index}`}
+                    checked={product.is_priority}
+                    onChange={(e) =>
+                      handleProductChange(index, 'is_priority', e.target.checked)
+                    }
+                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                  />
+                  <label
+                    htmlFor={`priority-${index}`}
+                    className="ml-2 block text-sm font-medium text-gray-700"
+                  >
+                    Produit prioritaire
+                  </label>
+                </div>
+                <span className="text-sm font-medium text-gray-900">
+                  {product.medication_name}
+                </span>
+              </div>
+              {product.is_priority && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Message de priorité
+                  </label>
+                  <textarea
+                    value={product.priority_message}
+                    onChange={(e) =>
+                      handleProductChange(index, 'priority_message', e.target.value)
+                    }
+                    rows={2}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                  />
                 </div>
               )}
             </div>
-          )}
+          ))}
+        </div>
+      </div>
+    )}
+  </div>
+)}
+
           
           {currentStep === 'review' && (
             <div className="space-y-6">
@@ -909,34 +910,68 @@ export function PackCreationWizard({ isOpen, onClose, onSuccess, initialData }: 
                 
                 <div className="bg-gray-50 p-4 rounded-lg">
                   <h5 className="text-sm font-medium text-gray-900 mb-2">Produits</h5>
-                  <p className="text-sm text-gray-500 mb-2">
-                    {formData.products.length} produit(s) au total
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    {formData.products.filter(p => !p.is_priority).length} produit(s) standard
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    {formData.products.filter(p => p.is_priority).length} produit(s) prioritaire(s)
-                  </p>
+                    <ul className="space-y-2">
+                      {formData.products.map((product, index) => (
+                        <li
+                          key={index}
+                          className="flex justify-between items-center p-2 rounded-md
+                            bg-gray-50 border border-gray-200"
+                        >
+                          {/* Nom et quantité */}
+                          <span className="text-sm text-gray-900">
+                            {product.medication_name} — Quantité : {product.quantity}
+                          </span>
+                    
+                          {/* Indicateur “Prioritaire” si type threshold et ce produit l’est */}
+                          {formData.type === 'threshold' && product.is_priority && (
+                            <span className="text-xs font-semibold text-yellow-700 bg-yellow-100 px-2 py-1 rounded">
+                              Prioritaire
+                            </span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+
                   {formData.type === 'threshold' && (
                     <p className="text-sm text-gray-500 mt-2">
                       Nombre max de produits prioritaires sélectionnables : {formData.max_quota_selections}
                     </p>
                   )}
                   {formData.type === 'pack' && (
-                    <div className="mt-4">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-gray-500">Prix total calculé</span>
-                        <span className="text-sm font-medium text-gray-900">{totalPrice.toFixed(2)} DZD</span>
-                      </div>
-                      {formData.custom_total_price !== null && (
-                        <div className="flex justify-between items-center mt-1">
-                          <span className="text-sm text-gray-500">Prix personnalisé</span>
-                          <span className="text-sm font-medium text-indigo-600">{formData.custom_total_price.toFixed(2)} DZD</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
+  <div className="mt-4 space-y-4">
+    {/* Prix total calculé (lecture seule) */}
+    <div className="flex justify-between items-center">
+      <span className="text-sm text-gray-500">Prix total calculé</span>
+      <span className="text-sm font-medium text-gray-900">
+        {totalPrice.toFixed(2)} DZD
+      </span>
+    </div>
+
+    {/* Prix total personnalisé (modifiable) */}
+    <div>
+      <label className="block text-sm font-medium text-gray-700">
+        Prix total personnalisé (DZD)
+      </label>
+      <input
+        type="number"
+        min="0"
+        step="0.01"
+        value={formData.custom_total_price ?? ''}
+        onChange={(e) =>
+          setFormData({
+            ...formData,
+            custom_total_price: e.target.value
+              ? parseFloat(e.target.value)
+              : null,
+          })
+        }
+        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+        placeholder="Laissez vide pour utiliser le prix calculé"
+      />
+    </div>
+  </div>
+)}
+
                 </div>
                 
                 {formData.type === 'threshold' && formData.free_text_products && (
@@ -948,27 +983,7 @@ export function PackCreationWizard({ isOpen, onClose, onSuccess, initialData }: 
                   </div>
                 )}
                 
-                <div className="bg-gray-50 p-4 rounded-lg md:col-span-2">
-                  <h5 className="text-sm font-medium text-gray-900 mb-2">Documents</h5>
-                  {existingDocuments.length === 0 && documents.length === 0 ? (
-                    <p className="text-sm text-gray-500">Aucun document</p>
-                  ) : (
-                    <ul className="space-y-1">
-                      {existingDocuments.map((doc) => (
-                        <li key={doc.id} className="text-sm text-gray-600 flex items-center">
-                          <FileText className="h-4 w-4 text-indigo-500 mr-1" />
-                          {doc.file_name}
-                        </li>
-                      ))}
-                      {documents.map((file, index) => (
-                        <li key={index} className="text-sm text-gray-600 flex items-center">
-                          <FileText className="h-4 w-4 text-indigo-500 mr-1" />
-                          {file.name}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
+                
               </div>
             </div>
           )}

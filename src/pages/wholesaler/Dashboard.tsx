@@ -9,7 +9,6 @@ import { Analytics } from "./Analytics";
 import { Profile } from "../shared/Profile";
 import { Parapharmacy } from "./Parapharmacy";
 import { DailyActions } from "./DailyActions";
-import { PromotionalOffers } from "./PromotionalOffers";
 import { PackManagement } from "./PackManagement";
 
 const WholesalerDashboard: React.FC = () => {
@@ -22,7 +21,6 @@ const WholesalerDashboard: React.FC = () => {
     { name: 'Parapharmacie', href: '/wholesaler/parapharmacy', icon: Sparkles },
     { name: 'Commandes', href: '/wholesaler/orders', icon: ShoppingCart },
     { name: 'Promotions', href: '/wholesaler/promotions', icon: Percent },
-    { name: 'Offres spéciales', href: '/wholesaler/offers', icon: Tag },
     { name: 'Packs', href: '/wholesaler/packs', icon: Package },
     { name: 'Analytiques', href: '/wholesaler/analytics', icon: TrendingUp },
     { name: 'Profil', href: '/wholesaler/profile', icon: User },
@@ -127,7 +125,6 @@ const WholesalerDashboard: React.FC = () => {
                 <Route path="parapharmacy" element={<Parapharmacy />} />
                 <Route path="orders" element={<Orders />} />
                 <Route path="promotions" element={<Promotions />} />
-                <Route path="offers" element={<PromotionalOffers />} />
                 <Route path="packs" element={<PackManagement />} />
                 <Route path="analytics" element={<Analytics />} />
                 <Route path="profile" element={<Profile />} />

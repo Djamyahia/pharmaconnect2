@@ -238,7 +238,7 @@ function OrderModal({ offer, onClose, onConfirm, loading }: OrderModalProps) {
             {priorityProducts.length > 0 && (
               <button
                 type="button"
-                onClick={() => onConfirm(null, freeTextProducts)}
+                onClick={() => onConfirm(null, pharmacistInput)}
                 className="px-4 py-2 border border-indigo-300 text-indigo-700 rounded-md hover:bg-indigo-50"
                 disabled={loading}
               >
@@ -700,7 +700,7 @@ export function OfferDetails() {
 
           {offer.type === 'threshold' && offer.free_text_products && (
             <div className="mb-6 bg-blue-50 p-4 rounded-lg">
-              <h2 className="text-lg font-medium text-blue-800 mb-2">Produits demandés par le pharmacien</h2>
+              <h2 className="text-lg font-medium text-blue-800 mb-2">Liste de produits proposés</h2>
               <p className="text-sm text-blue-700">{offer.free_text_products}</p>
             </div>
           )}
@@ -719,116 +719,81 @@ export function OfferDetails() {
             </div>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-6">
-            <div>
-              <h2 className="text-lg font-medium text-gray-900 mb-4">Produits inclus dans l'offre</h2>
-              <div className="bg-white border rounded-lg overflow-hidden">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Produit
-                      </th>
-                      <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Quantité
-                      </th>
-                      <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Prix
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {offer.products
-                      .filter(product => !product.is_priority)
-                      .map((product) => (
-                        <tr key={product.id}>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm font-medium text-gray-900">
-                              {product.medication.commercial_name}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              {product.medication.form} - {product.medication.dosage}
-                            </div>
-                            {product.free_units_percentage && (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 mt-1">
-                                +{product.free_units_percentage}% UG
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-500">
-                            {product.quantity}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">
-                            {product.price.toFixed(2)} DZD
-                          </td>
-                        </tr>
-                      ))}
-                  </tbody>
-                  <tfoot className="bg-gray-50">
-                    <tr>
-                      <td colSpan={2} className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">
-                        Total:
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">
-                        {offer.custom_total_price !== null && offer.custom_total_price !== undefined
-                          ? offer.custom_total_price.toFixed(2)
-                          : offer.products
-                              .filter(product => !product.is_priority)
-                              .reduce((sum, product) => sum + (product.price * product.quantity), 0)
-                              .toFixed(2)} DZD
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
+          <div className="mb-6">
+  <h2 className="text-lg font-medium text-gray-900 mb-4">Produits dans l’offre</h2>
+  <div className="bg-white border rounded-lg overflow-x-auto">
+    <table className="min-w-full divide-y divide-gray-200 table-fixed w-full">
+      <thead className="bg-gray-50">
+        <tr>
+          <th className="w-2/4 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            Produit
+          </th>
+          <th className="w-1/4 px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+            Quantité
+          </th>
+          <th className="w-1/4 px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+            P.U
+          </th>
+        </tr>
+      </thead>
+      <tbody className="bg-white divide-y divide-gray-200">
+        {offer.products.map(product => (
+          <tr key={product.id}>
+            <td className="px-6 py-4 whitespace-normal break-words">
+              <div className="text-sm font-medium text-gray-900">
+                {product.medication.commercial_name}
               </div>
-            </div>
+              <div className="text-xs text-gray-500">
+                {product.medication.form} – {product.medication.dosage}
+              </div>
+              {product.free_units_percentage && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 mt-1">
+                  +{product.free_units_percentage}% UG
+                </span>
+              )}
+            </td>
+            <td className="px-6 py-4 text-center text-sm text-gray-500">
+              {product.quantity}
+            </td>
+            <td className="px-6 py-4 text-right text-sm text-gray-900">
+              {product.price.toFixed(2)} DZD
+            </td>
+          </tr>
+        ))}
+      </tbody>
+      <tfoot className="bg-gray-50">
+        <tr>
+          <td colSpan={2} className="px-6 py-4 text-right text-sm font-medium text-gray-900">
+            Total calculé :
+          </td>
+          <td className="px-6 py-4 text-right text-sm font-medium text-gray-900">
+            {offer.products
+              .reduce((sum, p) => sum + p.price * p.quantity, 0)
+              .toFixed(2)} DZD
+          </td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</div>
 
-            {offer.products.some(product => product.is_priority) && (
-              <div>
-                <h2 className="text-lg font-medium text-gray-900 mb-4">Produits à disponibilité prioritaire</h2>
-                <div className="bg-green-50 p-4 rounded-lg">
-                  <p className="text-sm text-green-700 mb-4">
-                    Cette offre vous donne accès à des produits à disponibilité prioritaire. 
-                    {offer.max_quota_selections 
-                      ? ` Vous pouvez choisir jusqu'à ${offer.max_quota_selections} produits parmi les suivants :`
-                      : ' Vous pouvez choisir un seul produit parmi les suivants :'}
-                  </p>
-                  <div className="space-y-4">
-                    {offer.products
-                      .filter(product => product.is_priority)
-                      .map((product) => (
-                        <div key={product.id} className="bg-white p-4 rounded-lg shadow-sm">
-                          <div className="text-sm font-medium text-gray-900">
-                            {product.medication.commercial_name}
-                          </div>
-                          <div className="text-xs text-gray-500 mb-2">
-                            {product.medication.form} - {product.medication.dosage}
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <div className="text-sm text-gray-600">
-                              Quantité: {product.quantity}
-                            </div>
-                            <div className="text-sm font-medium text-gray-900">
-                              {product.price.toFixed(2)} DZD
-                            </div>
-                          </div>
-                          {product.free_units_percentage && (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 mt-2">
-                              +{product.free_units_percentage}% UG
-                            </span>
-                          )}
-                          {product.priority_message && (
-                            <div className="mt-2 text-xs text-green-600 italic">
-                              {product.priority_message}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+          <div className="mt-10 flex justify-end">
+  <div className="bg-indigo-100 p-4 rounded-lg shadow-md w-full max-w-sm">
+    <div className="flex justify-between items-center">
+      <span className="text-base font-semibold text-gray-900">
+  Total de l’offre{offer.custom_total_price != null && ' (Prix remisé)'} :
+</span>
+
+      <span className="text-xl font-bold text-indigo-900">
+        {(
+          (offer.custom_total_price ?? 0) ||
+          offer.products.reduce((sum, p) => sum + p.price * p.quantity, 0)
+        ).toFixed(2)} DZD
+      </span>
+    </div>
+  </div>
+</div>
+
 
           <div className="flex justify-center mt-8">
             <button
