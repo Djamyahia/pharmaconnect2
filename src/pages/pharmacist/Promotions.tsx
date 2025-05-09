@@ -9,7 +9,7 @@ import { algerianWilayas } from '../../lib/wilayas';
 import { sendOrderNotification } from '../../lib/notifications';
 import { UserLink } from '../../components/UserLink';
 
-type ExtendedPromotion = Promotion & {
+export type ExtendedPromotion = Promotion & {
   medications: Medication;
   wholesaler: {
     company_name: string;
@@ -149,13 +149,18 @@ export function Promotions() {
           )
         `);
 
+      
+
       if (searchQuery) {
-        query = query.textSearch('medications.search_vector', searchQuery);
+  // full-text search avec préfixe : match “searchQuery:*”
+        query = query.textSearch(
+          'medications.search_vector',
+          `${searchQuery}:*`
+        );
       }
 
-      if (selectedWilaya) {
-        query = query.contains('wholesaler.delivery_wilayas', [selectedWilaya]);
-      }
+
+
 
       const { data, error } = await query;
 
@@ -174,39 +179,71 @@ export function Promotions() {
     try {
       setOrderLoading(promotion.id);
 
-      const { data: orderData, error: orderError } = await supabase
+      // 1) récupérer le prix unitaire depuis l'inventaire
+      const { data: inv, error: invErr } = await supabase
+        .from('wholesaler_inventory')
+        .select('price')
+        .eq('wholesaler_id', promotion.wholesaler_id)
+        .eq('medication_id', promotion.medication_id)
+        .single();
+      if (invErr || !inv) throw invErr || new Error('Impossible de récupérer le prix');
+
+      const unitPrice      = inv.price;
+      const paidQty        = quantity;
+      const freeQty        = Math.floor(quantity * promotion.free_units_percentage / 100);
+      const totalAmountNum = paidQty * unitPrice;
+      const totalAmount    = `${totalAmountNum.toFixed(2)} DZD`;
+
+      // 2) créer la commande avec le montant correct
+      const { data: orderData, error: orderErr } = await supabase
         .from('orders')
         .insert({
           pharmacist_id: user.id,
           wholesaler_id: promotion.wholesaler_id,
-          total_amount: quantity,
+          total_amount: totalAmountNum,
           status: 'pending'
         })
         .select()
         .single();
+      if (orderErr || !orderData) throw orderErr;
 
-      if (orderError) throw orderError;
-
-      const { error: itemError } = await supabase
-        .from('order_items')
-        .insert({
-          order_id: orderData.id,
+      // 3) créer les lignes payantes puis gratuites
+      const items = [{
+        order_id:     orderData.id,
+        medication_id: promotion.medication_id,
+        quantity:      paidQty,
+        unit_price:    unitPrice
+      }];
+      if (freeQty > 0) {
+        items.push({
+          order_id:     orderData.id,
           medication_id: promotion.medication_id,
-          quantity: quantity,
-          unit_price: 0
+          quantity:      freeQty,
+          unit_price:    0
         });
+      }
+      const { error: itemsErr } = await supabase
+        .from('order_items')
+        .insert(items);
+      if (itemsErr) throw itemsErr;
 
-      if (itemError) throw itemError;
-
+      // 4) notifier par email en passant unit_price et free_units_count
       try {
         await sendOrderNotification(
           'order_placed',
           promotion.wholesaler.email,
           {
-            wholesaler_name: promotion.wholesaler.company_name,
-            pharmacist_name: user.company_name,
-            order_id: orderData.id,
-            total_amount: `${quantity} unités`
+            wholesaler_name:         promotion.wholesaler.company_name,
+            pharmacist_name:         user.company_name,
+            order_id:                orderData.id,
+            product_name:            promotion.medications.commercial_name,
+            product_form:            promotion.medications.form,
+            product_dosage:          promotion.medications.dosage,
+            quantity:                paidQty.toString(),
+            unit_price:              unitPrice.toFixed(2),
+            free_units_percentage:   promotion.free_units_percentage.toString(),
+            free_units_count:        freeQty.toString(),
+            total_amount:            totalAmount
           }
         );
       } catch (emailError) {
@@ -369,3 +406,4 @@ export function Promotions() {
     </div>
   );
 }
+export { OrderModal };

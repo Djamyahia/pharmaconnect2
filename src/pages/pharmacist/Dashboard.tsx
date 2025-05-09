@@ -16,10 +16,10 @@ const PharmacistDashboard: React.FC = () => {
 
   const navigation = [
     { name: 'Pharmacie', href: '/pharmacist/products', icon: Pill },
-    { name: 'Parapharmacie', href: '/pharmacist/parapharmacy', icon: Sparkles },
-    { name: 'Commandes', href: '/pharmacist/orders', icon: ShoppingCart },
-    { name: 'Promotions', href: '/pharmacist/promotions', icon: Percent },
+    { name: 'Parapharmacie', href: '/pharmacist/parapharmacy', icon: Sparkles },    
+    { name: 'Ventes Flash UG', href: '/pharmacist/promotions', icon: Percent },
     { name: 'Packs', href: '/pharmacist/offers', icon: Package },
+    { name: 'Commandes', href: '/pharmacist/orders', icon: ShoppingCart },
     { name: 'Analytiques', href: '/pharmacist/analytics', icon: TrendingUp },
     { name: 'Profil', href: '/pharmacist/profile', icon: User },
   ];

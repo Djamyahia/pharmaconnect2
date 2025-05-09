@@ -19,9 +19,10 @@ const WholesalerDashboard: React.FC = () => {
     { name: 'Actions du jour', href: '/wholesaler/daily', icon: Clock },
     { name: 'Pharmacie', href: '/wholesaler/inventory', icon: Pill },
     { name: 'Parapharmacie', href: '/wholesaler/parapharmacy', icon: Sparkles },
-    { name: 'Commandes', href: '/wholesaler/orders', icon: ShoppingCart },
-    { name: 'Promotions (UG)', href: '/wholesaler/promotions', icon: Percent },
+    
+    { name: 'Ventes Flash UG', href: '/wholesaler/promotions', icon: Percent },
     { name: 'Packs', href: '/wholesaler/packs', icon: Package },
+    { name: 'Commandes', href: '/wholesaler/orders', icon: ShoppingCart },
     { name: 'Analytiques', href: '/wholesaler/analytics', icon: TrendingUp },
     { name: 'Profil', href: '/wholesaler/profile', icon: User },
   ];

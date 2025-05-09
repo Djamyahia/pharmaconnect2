@@ -140,10 +140,7 @@ function OrderModal({ medication, inventory, price, onClose, onConfirm, loading 
             <p className="text-sm text-gray-500">Stock disponible : {inventory.quantity} unités</p>
             <p className="text-sm font-medium text-gray-900">Prix unitaire : {inventory.price.toFixed(2)} DZD</p>
           </div>
-          <div className="mt-2">
-            <p className="text-sm text-gray-500 mb-1">Wilayas de livraison :</p>
-            {formatWilayasList(inventory.delivery_wilayas)}
-          </div>
+          
         </div>
 
         {error && (
@@ -381,6 +378,7 @@ export function Products() {
       if (itemError) throw itemError;
 
       try {
+        const freeUnits = Math.floor(paidQty * promotion.free_units_percentage/100);
         await sendOrderNotification(
           'order_placed',
           inventory.users.email,
@@ -388,7 +386,9 @@ export function Products() {
             wholesaler_name: inventory.users.company_name,
             pharmacist_name: user.company_name,
             order_id: orderData.id,
-            total_amount: `${(inventory.price * quantity).toFixed(2)} DZD`
+            total_amount: `${(inventory.price * quantity).toFixed(2)} DZD`,
+            free_units_percentage:    promotion.free_units_percentage.toString(),
+            free_units_count:         freeUnits.toString()
           }
         );
       } catch (emailError) {
@@ -465,24 +465,8 @@ export function Products() {
                         </p>
                       </div>
                       <div className="flex flex-col space-y-2">
-                        {medication.offers && medication.offers.length > 0 && (
-                          <Link
-                            to={`/pharmacist/offers/${medication.offers[0].id}`}
-                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 hover:bg-blue-200"
-                          >
-                            <Tag className="h-3 w-3 mr-1" />
-                            Inclus dans une offre
-                          </Link>
-                        )}
-                        {medication.isPriorityInOffers && medication.isPriorityInOffers.length > 0 && (
-                          <Link
-                            to={`/pharmacist/offers/${medication.isPriorityInOffers[0].id}`}
-                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 hover:bg-green-200"
-                          >
-                            <Tag className="h-3 w-3 mr-1" />
-                            Accès prioritaire disponible
-                          </Link>
-                        )}
+                        
+                        
                       </div>
                     </div>
                     <div className="mt-2 grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -515,8 +499,13 @@ export function Products() {
                     </h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {medication.wholesaler_inventory.map((inventory) => {
-                        const promoKey = `${inventory.wholesaler_id}-${medication.id}`;
-                        const activePromotion = promotionsMap[promoKey];
+                        const promoKey        = `${inventory.wholesaler_id}-${medication.id}`;
+       const activePromotion = promotionsMap[promoKey];
+       // on récupère aussi les packs valides pour CE grossiste
+       const packOffers = offers.filter(offer =>
+         offer.wholesaler_id === inventory.wholesaler_id        
+         && offer.products.some(p => p.medication_id === medication.id)
+       );
                         
                         return (
                           <div
@@ -524,23 +513,50 @@ export function Products() {
                             className="flex flex-col p-4 bg-white border rounded-lg shadow-sm hover:shadow-md transition-shadow"
                           >
                             <div className="flex items-start justify-between">
-                              <div className="flex items-start space-x-3">
-                                <div className="flex-1">
-                                  <p className="font-medium text-gray-900">
-                                    <UserLink user={inventory.users} />
-                                  </p>
-                                  <p className="text-sm text-gray-600">{inventory.users.wilaya}</p>
-                                  <p className="text-xs text-gray-500 mt-1">
-                                    Livre dans : {inventory.delivery_wilayas.map(w => algerianWilayas.find(aw => aw.value === w)?.label).join(', ')}
-                                  </p>
-                                </div>
-                              </div>
-                              {activePromotion && (
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                  {activePromotion.free_units_percentage}% UG
-                                </span>
-                              )}
-                            </div>
+      <div className="flex items-start space-x-3">
+        <div className="flex-1">
+          <p className="font-medium text-gray-900">
+            <UserLink user={inventory.users} />
+          </p>
+          
+          {/* — Packs sous le nom, alignés à gauche — */}
+          {packOffers.length > 0 && (
+            <div className="mt-2 text-left">
+              <span className="text-sm font-medium text-gray-500">Disponible dans un Pack :</span>
+              <div className="flex flex-wrap gap-2 mt-1">
+                {packOffers.map(pack => (
+                  <Link
+    key={pack.id}
+    to={`/pharmacist/offers/${pack.id}`}
+    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+      ${
+        pack.type === 'pack'
+          ? 'bg-red-100 text-orange-800 hover:bg-orange-200'    // pack fixe → vert
+          : 'bg-blue-100 text-blue-800 hover:bg-blue-200'       // achat libre/seuil → bleu
+      }
+    `}
+  >
+    {pack.name}
+  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Badge promo à droite */}
+      {activePromotion && (
+        <Link
+          to="/pharmacist/promotions"
+          className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 hover:bg-green-200"
+        >
+          Existe en vente flash {activePromotion.free_units_percentage}% UG
+        </Link>
+      )}
+    </div>
+
+                            
                             
                             <div className="mt-4 flex items-center justify-between">
                               <div>
