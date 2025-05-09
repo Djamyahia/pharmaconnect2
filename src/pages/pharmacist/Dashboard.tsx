@@ -1,6 +1,6 @@
 import React from "react";
 import { Routes, Route, Link, useLocation } from "react-router-dom";
-import { Package, ShoppingCart, Percent, User, TrendingUp, Sparkles, Tag } from "lucide-react";
+import { Package, ShoppingCart, Percent, User, TrendingUp, Sparkles, Tag, Pill } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { Products } from "./Products";
 import { Orders } from "./Orders";
@@ -15,11 +15,11 @@ const PharmacistDashboard: React.FC = () => {
   const { user } = useAuth();
 
   const navigation = [
-    { name: 'Pharmacie', href: '/pharmacist/products', icon: Package },
+    { name: 'Pharmacie', href: '/pharmacist/products', icon: Pill },
     { name: 'Parapharmacie', href: '/pharmacist/parapharmacy', icon: Sparkles },
     { name: 'Commandes', href: '/pharmacist/orders', icon: ShoppingCart },
     { name: 'Promotions', href: '/pharmacist/promotions', icon: Percent },
-    { name: 'Offres spéciales', href: '/pharmacist/offers', icon: Tag },
+    { name: 'Packs', href: '/pharmacist/offers', icon: Package },
     { name: 'Analytiques', href: '/pharmacist/analytics', icon: TrendingUp },
     { name: 'Profil', href: '/pharmacist/profile', icon: User },
   ];
