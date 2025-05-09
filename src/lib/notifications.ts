@@ -1,6 +1,5 @@
 import { supabase } from './supabase';
 
-
 type EmailTemplate = {
   subject: string;
   content: string;
@@ -13,58 +12,46 @@ async function getEmailTemplate(type: string): Promise<EmailTemplate | null> {
       .select('subject, content')
       .eq('type', type)
       .maybeSingle();
-
     if (error) {
       console.error('Error fetching email template:', error);
       return null;
     }
-
     return data;
-  } catch (error) {
-    console.error('Error in getEmailTemplate:', error);
+  } catch (err) {
+    console.error('Error in getEmailTemplate:', err);
     return null;
   }
 }
 
 function replacePlaceholders(text: string, replacements: Record<string, string>): string {
   // Handle conditional blocks first
-  text = text.replace(/{{#if ([^}]+)}}(.*?){{\/if}}/g, (match, condition, content) => {
-    const conditionValue = replacements[condition];
-    return conditionValue ? content : '';
-  });
-
+  text = text.replace(/{{#if ([^}]+)}}([\s\S]*?){{\/if}}/g, (_, key, content) =>
+    replacements[key] ? content : ''
+  );
   // Then replace regular placeholders
-  return text.replace(/\{\{(\w+)\}\}/g, (match, key) => replacements[key] || match);
+  return text.replace(/{{(\w+)}}/g, (_, key) => replacements[key] || '');
 }
 
 async function sendEmail(to: string, subject: string, content: string) {
   try {
     const functionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-email-fixed`;
-    
-    const response = await fetch(functionUrl, {
+    const res = await fetch(functionUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
       },
-      body: JSON.stringify({
-        to,
-        subject,
-        content,
-      }),
+      body: JSON.stringify({ to, subject, content }),
     });
-
-    if (!response.ok) {
-      const result = await response.json();
-      console.error('Error response from send-email function:', result);
-      throw new Error(`Failed to send email: ${result.message || 'Unknown error'}`);
+    if (!res.ok) {
+      const result = await res.json();
+      console.error('Error response from send-email:', result);
+      throw new Error(`Failed to send email: ${result.message || res.statusText}`);
     }
-
-    const result = await response.json();
-    return { success: true, result };
-  } catch (error) {
-    console.error('Error sending email:', error);
-    throw error;
+    return await res.json();
+  } catch (err) {
+    console.error('Error sending email:', err);
+    throw err;
   }
 }
 
@@ -74,180 +61,107 @@ export async function sendOrderNotification(
   replacements: Record<string, string>
 ) {
   try {
-    // If this is an order notification, fetch the order details
-    if (type === 'order_accepted' || type === 'order_placed' || type === 'order_canceled') {
+    const orderTypes = ['order_accepted', 'order_placed', 'order_canceled'];
+    if (orderTypes.includes(type)) {
       const orderId = replacements.order_id;
-      
-      // Get order items with product details
-      const { data: orderItems, error: itemsError } = await supabase
-        .from('order_items')
-        .select(`
-          quantity,
-          unit_price,
-          is_parapharmacy,
-          medications (
-            commercial_name,
-            form,
-            dosage
-          ),
-          parapharmacy_products (
-            name,
-            brand,
-            category
-          )
-        `)
-        .eq('order_id', orderId);
+      // Fetch order metadata to detect pack
+      const { data: orderMeta, error: metaErr } = await supabase
+        .from('orders')
+        .select('metadata')
+        .eq('id', orderId)
+        .single();
+      if (metaErr) console.error('Error fetching order metadata:', metaErr);
 
-      if (itemsError) {
-        console.error('Error fetching order items:', itemsError);
-      } else if (orderItems && orderItems.length > 0) {
-        // Process each order item
-        const processedItems = orderItems.map(item => {
-          if (item.is_parapharmacy && item.parapharmacy_products) {
-            return {
-              name: item.parapharmacy_products.name,
-              brand: item.parapharmacy_products.brand || '',
-              category: item.parapharmacy_products.category,
-              form: '',
-              dosage: '',
-              quantity: item.quantity,
-              unit_price: item.unit_price
-            };
-          } else if (!item.is_parapharmacy && item.medications) {
-            return {
-              name: item.medications.commercial_name,
-              form: item.medications.form,
-              dosage: item.medications.dosage,
-              quantity: item.quantity,
-              unit_price: item.unit_price
-            };
-          }
-          return null;
-        }).filter(Boolean);
+      const offerId = orderMeta?.metadata?.offer_id;
+      let productsList = '';
 
-        // dans sendOrderNotification, au moment de créer productsList :
-const NBSP = '\u00A0';   // espace insécable
-const NBHY = '\u2011';   // tiret insécable
-const SEP  = `${NBSP}${NBHY}${NBSP}`; // " - "
-
-// … puis :
-const productsList = processedItems
-  .map(item => {
-    // 1) remplacez tous les "-" normaux par des non-breaking hyphens
-    const safeName   = item.name?.replace(/-/g, NBHY)   || '';
-    const safeForm   = item.form?.replace(/-/g, NBHY)   || '';
-    const safeDosage = item.dosage?.replace(/-/g, NBHY) || '';
-
-    // 2) construisez la ligne en collant nom, forme et dosage
-    let line = `-${NBSP}${safeName}`;      // "- NomProduit"
-
-    if (safeForm) {
-      line += `${SEP}${safeForm}`;         // " - Forme"
-    }
-    if (safeDosage) {
-      line += `${SEP}${safeDosage}`;       // " - Dosage"
-    }
-
-    // 3) ajoutez la partie entre parenthèses
-    line += ` (${item.quantity} unités à ${item.unit_price.toFixed(2)} DZD = `
-         + `${(item.quantity * item.unit_price).toFixed(2)} DZD)`;
-
-    return line;
-  })
-  .join('\n');
-
-
-
-        replacements.products_list = productsList;
+      if (offerId) {
+        // Pack: fetch offer_products to get %UG
+        const { data: offerProducts, error: opErr } = await supabase
+          .from('offer_products')
+          .select('quantity, price, free_units_percentage, medications(commercial_name, form, dosage)')
+          .eq('offer_id', offerId);
+        if (opErr) console.error('Error fetching offer_products:', opErr);
+        else if (offerProducts) {
+          productsList = offerProducts
+            .map(op => {
+              const { commercial_name, form, dosage } = op.medications;
+              const label = `${commercial_name}${form ? ` – ${form}` : ''}${dosage ? ` ${dosage}` : ''}`;
+              const paidQty = op.quantity;
+              const unitPrice = op.price;
+              const total = (paidQty * unitPrice).toFixed(2);
+              const ugPct = op.free_units_percentage || 0;
+              let line = `- ${label} : ${paidQty} unité(s) payante(s)`;
+              if (ugPct > 0) {
+                line += `, +${ugPct}% UG`;
+              }
+              line += ` à ${unitPrice.toFixed(2)} DZD chacune (Total payé = ${total} DZD)`;
+              return line;
+            })
+            .join('\n');
+        }
+      } else {
+        // Normal: fetch order_items
+        const { data: orderItems, error: itemsErr } = await supabase
+          .from('order_items')
+          .select('quantity, unit_price, is_parapharmacy, medications(commercial_name, form, dosage), parapharmacy_products(name)')
+          .eq('order_id', orderId);
+        if (itemsErr) console.error('Error fetching order_items:', itemsErr);
+        else if (orderItems) {
+          productsList = orderItems
+            .map(item => {
+              const name = item.is_parapharmacy ? item.parapharmacy_products!.name : item.medications!.commercial_name;
+              const form = item.medications?.form || '';
+              const dosage = item.medications?.dosage || '';
+              const qty = item.quantity;
+              const price = item.unit_price;
+              const total = (qty * price).toFixed(2);
+              return `- ${name}${form ? ` – ${form}` : ''}${dosage ? ` ${dosage}` : ''}` +
+                     ` : ${qty} unité(s) à ${price.toFixed(2)} DZD chacune (Total = ${total} DZD)`;
+            })
+            .join('\n');
+        }
       }
+      replacements.products_list = productsList;
     }
 
-    // Special handling for offer orders
+    // Pack inline template override
     if (replacements.offer_name) {
-      replacements.product_name = replacements.offer_name;
-      replacements.product_form = '';
-      replacements.product_dosage = '';
-      replacements.product_brand = '';
-      replacements.product_category = replacements.offer_type || '';
-      
-      // For threshold offers, include the minimum purchase amount in the email
-      if (replacements.offer_type === 'Offre sur achats libres' && replacements.min_purchase_amount) {
-        replacements.min_purchase_amount = replacements.min_purchase_amount;
-      }
-      
-      // Create a special template for pack orders if it doesn't exist
-      if (!await getEmailTemplate('pack_order_placed')) {
-        // Create a custom email content for pack orders
-        const packOrderContent = `Bonjour {{wholesaler_name}},
+      const tpl = `Bonjour {{wholesaler_name}},
 
 Une nouvelle commande de pack a été passée par {{pharmacist_name}}.
 
 Détails de la commande :
 - Numéro de commande : {{order_id}}
-- Nom du pack : {{offer_name}}
-- Type : {{offer_type}}
+- Nom du pack          : {{offer_name}}
+- Type de pack         : {{offer_type}}
 {{#if min_purchase_amount}}- Montant minimum d'achat : {{min_purchase_amount}} DZD{{/if}}
-- Montant total : {{total_amount}}
+- Montant total        : {{total_amount}}
 
-Liste des produits :
+Liste des produits (UG indiquées par produit) :
 {{products_list}}
 
-Veuillez vous connecter à votre espace grossiste sur PharmaConnect :
+Vous pouvez consulter cette commande dans votre espace grossiste :
 {{dashboard_url}}
 
 Cordialement,
 L'équipe PharmaConnect`;
-
-        // Use this content instead of fetching from database
-        const template = {
-          subject: 'Nouvelle commande de pack reçue',
-          content: packOrderContent
-        };
-        
-        const subject = replacePlaceholders(template.subject, replacements);
-        let content = replacePlaceholders(template.content, replacements);
-        
-        // Add dashboard URL
-        content = content.replace('{{dashboard_url}}', `${window.location.origin}/wholesaler/orders`);
-
-        // Add free text products if available
-        if (replacements.free_text_products) {
-          content = content.replace('Liste des produits :', `Liste des produits :\n\nProduits demandés par le pharmacien :\n${replacements.free_text_products}\n\nProduits inclus dans l'offre :`);
-        }
-
-        await sendEmail(recipientEmail, subject, content);
-        return;
-      }
+      const subject = replacePlaceholders('Nouvelle commande de pack reçue', replacements);
+      let content = replacePlaceholders(tpl, replacements);
+      content = content.replace('{{dashboard_url}}', `${window.location.origin}/wholesaler/orders`);
+      await sendEmail(recipientEmail, subject, content);
+      return;
     }
 
+    // Standard templates
     const template = await getEmailTemplate(type);
-    if (!template) {
-      throw new Error(`Email template not found for type: ${type}`);
-    }
-
-    const subject = replacePlaceholders(template.subject, replacements);
+    if (!template) throw new Error(`Template not found: ${type}`);
     let content = replacePlaceholders(template.content, replacements);
-    
-    // Add dashboard URL based on the notification type
-    if (type === 'order_placed') {
-      content = content.replace(/Cordialement,/g, 
-        `Vous pouvez consulter les détails de cette commande en vous connectant à votre espace grossiste sur PharmaConnect :\n${window.location.origin}/wholesaler/orders\n\nCordialement,`);
-      
-      // Add free text products if available
-      if (replacements.free_text_products) {
-        content = content.replace('Liste des produits :', `Liste des produits :\n\nProduits demandés par le pharmacien :\n${replacements.free_text_products}\n\nProduits inclus dans l'offre :`);
-      }
-    } else if (type === 'order_accepted') {
-      content = content.replace(/Cordialement,/g, 
-        `Vous pouvez consulter les détails de cette commande en vous connectant à votre espace pharmacien sur PharmaConnect :\n${window.location.origin}/pharmacist/orders\n\nCordialement,`);
-    } else if (type === 'order_canceled') {
-      content = content.replace(/Cordialement,/g, 
-        `Vous pouvez consulter les détails de cette commande en vous connectant à votre espace sur PharmaConnect :\n${window.location.origin}\n\nCordialement,`);
-    }
-
+    const subject = replacePlaceholders(template.subject, replacements);
+    if (type === 'order_placed') content = `Vous pouvez consulter votre commande : ${window.location.origin}/wholesaler/orders\n\n` + content;
+    else if (type === 'order_accepted') content = `Vous pouvez consulter votre commande : ${window.location.origin}/pharmacist/orders\n\n` + content;
     await sendEmail(recipientEmail, subject, content);
-  } catch (error) {
-    console.error('Error sending order notification email:', error);
-    // Don't throw the error to prevent breaking the app flow
+  } catch (err) {
+    console.error('Error in sendOrderNotification:', err);
   }
 }
