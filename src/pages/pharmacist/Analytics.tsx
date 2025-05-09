@@ -142,7 +142,10 @@ export function Analytics() {
       // Process medication statistics with detailed information
       const medicationMap = new Map();
       orderStats?.forEach(order => {
-        order.order_items.forEach(item => {
+        order.order_items?.forEach(item => {
+          // Skip if medications data is missing
+          if (!item?.medications) return;
+
           const key = item.medications.commercial_name;
           const current = medicationMap.get(key) || {
             medication_name: key,
@@ -174,7 +177,7 @@ export function Analytics() {
       // Process wholesaler statistics with detailed information
       const wholesalerMap = new Map();
       orderStats?.forEach(order => {
-        if (order.status === 'accepted') {
+        if (order.status === 'accepted' && order.users) {
           const key = order.users.company_name;
           const current = wholesalerMap.get(key) || {
             company_name: key,
@@ -191,11 +194,13 @@ export function Analytics() {
             date: order.created_at,
             status: order.status,
             total_amount: order.total_amount,
-            items: order.order_items.map(item => ({
-              medication_name: item.medications.commercial_name,
-              quantity: item.quantity,
-              unit_price: item.unit_price,
-            })),
+            items: order.order_items
+              .filter(item => item.medications) // Only include items with valid medication data
+              .map(item => ({
+                medication_name: item.medications.commercial_name,
+                quantity: item.quantity,
+                unit_price: item.unit_price,
+              })),
           });
 
           wholesalerMap.set(key, current);
@@ -209,7 +214,7 @@ export function Analytics() {
       // Process wilaya statistics with detailed information
       const wilayaMap = new Map();
       orderStats?.forEach(order => {
-        if (order.status === 'accepted') {
+        if (order.status === 'accepted' && order.users?.wilaya) {
           const key = order.users.wilaya;
           const current = wilayaMap.get(key) || {
             wilaya: key,

@@ -3,7 +3,7 @@ export type User = {
   email: string;
   role: 'pharmacist' | 'wholesaler';
   company_name: string;
-  registration_number: string;
+  registration_number: string | null;
   address: string;
   wilaya: string;
   phone: string;
@@ -11,6 +11,44 @@ export type User = {
   is_admin: boolean;
   created_at: string;
   delivery_wilayas: string[];
+  subscription?: UserSubscription;
+};
+
+export type ParapharmacyProduct = {
+  id: string;
+  name: string;
+  brand: string | null;
+  category: ParapharmacyCategory;
+  description: string | null;
+  packaging: string | null;
+  reference: string | null;
+  image_data: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ParapharmacyCategory =
+  | 'hygiene_and_care'
+  | 'dermocosmetics'
+  | 'dietary_supplements'
+  | 'mother_and_baby'
+  | 'orthopedics'
+  | 'hair_care'
+  | 'veterinary'
+  | 'sun_care'
+  | 'medical_devices'
+  | 'accessories';
+
+export type WholesalerParapharmacyInventory = {
+  id: string;
+  wholesaler_id: string;
+  product_id: string;
+  quantity: number;
+  price: number;
+  delivery_wilayas: string[];
+  created_at: string;
+  updated_at: string;
 };
 
 export type Medication = {
@@ -27,6 +65,8 @@ export type Medication = {
   storage_conditions: string | null;
   status: string;
   created_at: string;
+  laboratory?: string;
+  COND?: string;
 };
 
 export type WholesalerInventory = {
@@ -48,9 +88,6 @@ export type Promotion = {
   start_date: string;
   end_date: string;
   created_at: string;
-  unit_price?: number;
-  units_for_bonus?: number;
-  bonus_units?: number;
 };
 
 export type Order = {
@@ -68,7 +105,9 @@ export type Order = {
 export type OrderItem = {
   id: string;
   order_id: string;
-  medication_id: string;
+  medication_id: string | null;
+  product_id: string | null;
+  is_parapharmacy: boolean;
   quantity: number;
   unit_price: number;
   created_at: string;
@@ -112,4 +151,50 @@ export type AdminNote = {
   note: string;
   created_by: string;
   created_at: string;
+};
+
+export type PromotionalOffer = {
+  id: string;
+  wholesaler_id: string;
+  name: string;
+  type: 'pack' | 'threshold';
+  min_purchase_amount: number | null;
+  is_public: boolean;
+  start_date: string;
+  end_date: string;
+  created_at: string;
+  custom_total_price: number | null;
+  comment?: string | null;
+  max_quota_selections?: number | null;
+  free_units_enabled?: boolean;
+};
+
+export type OfferProduct = {
+  id: string;
+  offer_id: string;
+  medication_id: string;
+  quantity: number;
+  price: number;
+  is_priority: boolean;
+  priority_message: string | null;
+  free_units_percentage?: number | null;
+  is_quota?: boolean;
+  medications?: Medication;
+};
+
+export type OfferDocument = {
+  id: string;
+  offer_id: string;
+  file_name: string;
+  file_type: string;
+  file_size: number;
+  file_path: string;
+  created_at: string;
+};
+
+export type ActiveOffer = PromotionalOffer & {
+  products: (OfferProduct & {
+    medication: Medication;
+  })[];
+  documents?: OfferDocument[];
 };

@@ -4,11 +4,14 @@ import { Layout } from './components/Layout';
 import { AuthProvider } from './contexts/AuthContext';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
-import { ResetPassword } from './pages/ResetPassword';
+import { UpdatePassword } from './pages/UpdatePassword';
 import { VerifyEmail } from './pages/VerifyEmail';
-import PharmacistDashboard from "./pages/pharmacist/Dashboard";
-import WholesalerDashboard from "./pages/wholesaler/Dashboard";
-import AdminDashboard from "./pages/admin/Dashboard";
+import PharmacistDashboard from './pages/pharmacist/Dashboard';
+import WholesalerDashboard from './pages/wholesaler/Dashboard';
+import AdminDashboard from './pages/admin/Dashboard';
+import { Home } from './pages/Home';
+import { PublicOffers } from './pages/PublicOffers';
+import { OfferDetails } from './pages/OfferDetails';
 import { useAuth } from './contexts/AuthContext';
 
 function DashboardRedirect() {
@@ -39,11 +42,13 @@ function App() {
       <AuthProvider>
         <Routes>
           <Route path="/" element={<Layout />}>
-            <Route index element={<DashboardRedirect />} />
+            <Route index element={<Home />} />
             <Route path="login" element={<Login />} />
             <Route path="register" element={<Register />} />
             <Route path="verify-email" element={<VerifyEmail />} />
-            <Route path="reset-password" element={<ResetPassword />} />
+            <Route path="update-password" element={<UpdatePassword />} />
+            <Route path="offers" element={<PublicOffers />} />
+            <Route path="offers/:id" element={<OfferDetails />} />
             <Route path="pharmacist/*" element={<PharmacistDashboard />} />
             <Route path="wholesaler/*" element={<WholesalerDashboard />} />
             <Route path="admin/*" element={<AdminDashboard />} />
