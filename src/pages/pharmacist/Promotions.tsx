@@ -349,7 +349,7 @@ export function Promotions() {
                         <div className="text-sm font-medium text-gray-900">
                           <UserLink user={promotion.wholesaler} />
                         </div>
-                        <div className="text-sm text-gray-500">{promotion.wholesaler.wilaya}</div>
+                        
                       </td>
                       <td className="px-4 py-4 text-center">
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
