@@ -30,4 +30,9 @@ export default defineConfig({
   },
   appType: 'spa',
   base: '/',
+  resolve: {
+    alias: {
+      '@': '/src',
+    },
+  },
 });
