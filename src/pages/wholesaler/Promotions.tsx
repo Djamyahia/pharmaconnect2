@@ -136,45 +136,58 @@ export function Promotions() {
   }
 
   async function fetchPromotions() {
-    if (!user?.id) return;
+  if (!user?.id) return;
+  setLoading(true);
 
-    try {
-      let query = supabase
-        .from('active_promotions_view')
-        .select(`
-          *,
-          medications!inner (
-            *,
-            search_vector
-          ),
-          wholesaler:users!promotions_wholesaler_id_fkey (
-            company_name,
-            wilaya,
-            email,
-            delivery_wilayas
-          )
-        `)
-        .eq('wholesaler_id', user.id)
-        .order('start_date', { ascending: true });
+  try {
+    // 1️⃣ Définir la date du jour pour le filtre
+    const today = new Date().toISOString().split('T')[0];
 
-      if (searchQuery) {
-        // full-text search avec préfixe : match "searchQuery:*"
-        query = query.textSearch(
-          'medications.search_vector',
-          `${searchQuery}:*`
-        );
-      }
+    // 2️⃣ Construire la query sur la table promotions
+    let query = supabase
+      .from('promotions')
+      .select(`
+        *,
+        medications!inner(
+          id,
+          commercial_name,
+          form,
+          dosage,
+          search_vector
+        ),
+        wholesaler:users!promotions_wholesaler_id_fkey(
+          company_name,
+          wilaya,
+          email,
+          delivery_wilayas
+        )
+      `)
+      .eq('wholesaler_id', user.id)
+      .gte('end_date', today)                    // n’affiche que les promos non expirées
+      .order('start_date', { ascending: true });
 
-      const { data, error } = await query;
-
-      if (error) throw error;
-      setPromotions(data || []);
-    } catch (error) {
-      console.error('Erreur lors de la récupération des promotions:', error);
-    } finally {
-      setLoading(false);
+    // 3️⃣ Appliquer le filtre full-text si l’utilisateur a tapé quelque chose
+    if (searchQuery) {
+      query = query.textSearch(
+        'medications.search_vector',
+        `${searchQuery}:*`
+      );
     }
+
+    // 4️⃣ Exécuter et récupérer data + error
+    // On récupère sous d'autres noms pour éviter le conflit
+    const { data: promotionsData, error: promotionsError } = await query;
+    if (promotionsError) throw promotionsError;
+    setPromotions(promotionsData || []);
+
+  } catch (err) {
+    console.error('Erreur lors de la récupération des promotions :', err);
+    setError('Impossible de charger les promotions.');
+  } finally {
+    setLoading(false);
   }
+}
+
 
   async function handleUpdatePromotion(id: string) {
     if (!editingPromotion) return;
@@ -200,25 +213,32 @@ export function Promotions() {
       return;
     }
 
-    try {
-      const { error } = await supabase
-        .from('promotions')
-        .update({
-          free_units_percentage: editingPromotion.free_units_percentage,
-          start_date: editingPromotion.start_date,
-          end_date: editingPromotion.end_date,
-          expiry_date: editingPromotion.expiry_date
-        })
-        .eq('id', id);
+    console.log('🔔 handleUpdatePromotion called', { id, editingPromotion });
+if (!editingPromotion) {
+  console.warn('Aucune promotion en cours d’édition');
+  return;
+}
 
-      if (error) throw error;
+try {
+  const { error } = await supabase
+    .from('promotions')
+    .update({
+      free_units_percentage: editingPromotion.free_units_percentage,
+      start_date: editingPromotion.start_date,
+      end_date: editingPromotion.end_date,
+      expiry_date: editingPromotion.expiry_date
+    })
+    .eq('id', id);
+  if (error) throw error;
+  console.log('✅ Update successful for', id);
+} catch (err) {
+  console.error('Error updating promotion:', err);
+  setError('Échec de la mise à jour. Vérifie la console pour plus de détails.');
+} finally {
+  setEditingPromotion(null);
+  await fetchPromotions();
+}
 
-      setEditingPromotion(null);
-      fetchPromotions();
-    } catch (error) {
-      console.error('Error updating promotion:', error);
-      setError('Failed to update promotion. Please try again.');
-    }
   }
 
   async function handleDeletePromotion(id: string) {
@@ -375,6 +395,11 @@ export function Promotions() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-semibold text-gray-900">Gestion des ventes flash UG</h2>
+         {error && (
+           <div className="ml-4 px-3 py-2 bg-red-50 border border-red-200 text-red-700 rounded-md">
+             {error}
+           </div>
+         )}
         <button
           onClick={() => setShowAddForm(true)}
           className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
@@ -554,13 +579,16 @@ export function Promotions() {
                         {editingPromotion?.id === promotion.id ? (
                           <div className="flex justify-end space-x-2">
                             <button
+                              type="button"                              // ← évite tout submit implicite
                               onClick={() => handleUpdatePromotion(promotion.id)}
+                                   
                               className="text-green-600 hover:text-green-900"
                               title="Enregistrer"
                             >
                               <Save className="h-5 w-5" />
                             </button>
                             <button
+                              type="button"
                               onClick={() => setEditingPromotion(null)}
                               className="text-gray-600 hover:text-gray-900"
                               title="Annuler"
@@ -571,6 +599,7 @@ export function Promotions() {
                         ) : (
                           <div className="flex justify-end space-x-2">
                             <button
+                              type="button"
                               onClick={() => setEditingPromotion({
                                 id: promotion.id,
                                 free_units_percentage: promotion.free_units_percentage,
@@ -584,6 +613,7 @@ export function Promotions() {
                               <Edit2 className="h-5 w-5" />
                             </button>
                             <button
+                              type="button"
                               onClick={() => handleDeletePromotion(promotion.id)}
                               className="text-red-600 hover:text-red-900"
                               title="Supprimer"
