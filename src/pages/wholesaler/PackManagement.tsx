@@ -5,6 +5,11 @@ import { useAuth } from '../../contexts/AuthContext';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { PackCreationWizard } from './PackCreationWizard';
+import { RegionSelector } from '../../components/RegionSelector';
+import { DeliveryDaysDisplay } from '../../components/DeliveryDaysDisplay';
+import { ExpiryDateDisplay } from '../../components/ExpiryDateDisplay';
+import { getDeliveryDays } from '../../lib/regions';
+import type { RegionWithDeliveryDays } from '../../types/supabase';
 
 type OfferDocument = {
   id: string;
@@ -107,6 +112,9 @@ export function PackManagement() {
   const [shareModalOpen, setShareModalOpen] = useState<string | null>(null);
   const [offerTypeFilter, setOfferTypeFilter] = useState<'all' | 'pack' | 'threshold'>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'upcoming' | 'expired'>('all');
+  const [selectedRegion, setSelectedRegion] = useState<RegionWithDeliveryDays | null>(null);
+  const [deliveryDaysMap, setDeliveryDaysMap] = useState<Record<string, string[] | null>>({});
+  const [loadingDeliveryDays, setLoadingDeliveryDays] = useState(false);
 
   useEffect(() => {
     if (user?.id) {
@@ -118,6 +126,35 @@ export function PackManagement() {
     // Filter offers client-side when search query or filters change
     filterOffers();
   }, [searchQuery, offerTypeFilter, statusFilter, allOffers]);
+
+  useEffect(() => {
+    if (selectedRegion) {
+      fetchDeliveryDaysForRegion();
+    } else {
+      setDeliveryDaysMap({});
+    }
+  }, [selectedRegion]);
+
+  async function fetchDeliveryDaysForRegion() {
+    if (!selectedRegion) return;
+    
+    setLoadingDeliveryDays(true);
+    const newDeliveryDaysMap: Record<string, string[] | null> = {};
+    
+    try {
+      // For each offer, get the wholesaler's delivery days for the selected region
+      for (const offer of allOffers) {
+        const deliveryDays = await getDeliveryDays(offer.wholesaler_id, selectedRegion.id);
+        newDeliveryDaysMap[offer.id] = deliveryDays;
+      }
+      
+      setDeliveryDaysMap(newDeliveryDaysMap);
+    } catch (error) {
+      console.error('Error fetching delivery days:', error);
+    } finally {
+      setLoadingDeliveryDays(false);
+    }
+  }
 
   async function fetchOffers() {
     try {
@@ -136,6 +173,7 @@ export function PackManagement() {
             is_priority,
             priority_message,
             free_units_percentage,
+            expiry_date,
             medications:medications (
               id,
               commercial_name,
@@ -252,7 +290,8 @@ export function PackManagement() {
         price: product.price,
         is_priority: product.is_priority,
         priority_message: product.priority_message,
-        free_units_percentage: product.free_units_percentage
+        free_units_percentage: product.free_units_percentage,
+        expiry_date: product.expiry_date
       }));
       
       if (productsToInsert.length > 0) {
@@ -388,16 +427,10 @@ export function PackManagement() {
             <option value="threshold">Achats libres</option>
           </select>
 
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as 'all' | 'active' | 'upcoming' | 'expired')}
-            className="border rounded-md py-2 px-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-          >
-            <option value="all">Tous les statuts</option>
-            <option value="active">Actifs</option>
-            <option value="upcoming">À venir</option>
-            <option value="expired">Terminés</option>
-          </select>
+          <RegionSelector 
+            onRegionChange={setSelectedRegion}
+            selectedRegion={selectedRegion}
+          />
         </div>
       </div>
 
@@ -433,6 +466,9 @@ export function PackManagement() {
                   </th>
                   <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Statut
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Livraison
                   </th>
                   <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Produits
@@ -501,9 +537,20 @@ export function PackManagement() {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center">
+                        <DeliveryDaysDisplay 
+                          deliveryDays={deliveryDaysMap[offer.id]}
+                          isLoading={loadingDeliveryDays}
+                        />
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-center">
                         <div className="text-sm text-gray-900">{standardProducts} standard</div>
                         <div className="text-xs text-green-600">
                           {priorityProducts} prioritaire{priorityProducts > 1 ? 's' : ''}
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          {offer.products.some(p => p.expiry_date) && (
+                            <span className="text-amber-600">Avec dates d'expiration</span>
+                          )}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">

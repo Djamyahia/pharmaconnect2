@@ -3,20 +3,23 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Search, Package, Tag, ShoppingCart, Calendar, Info, AlertCircle, CheckCircle, X, Loader2, FileText, Download } from 'lucide-react';
-import type { ActiveOffer, OfferDocument } from '../../types/supabase';
+import type { ActiveOffer, OfferDocument, RegionWithDeliveryDays } from '../../types/supabase';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { sendOrderNotification } from '../../lib/notifications';
-
+import { RegionSelector } from '../../components/RegionSelector';
+import { DeliveryDaysDisplay } from '../../components/DeliveryDaysDisplay';
+import { getDeliveryDays } from '../../lib/regions';
 
 type OrderModalProps = {
   offer: ActiveOffer & { documents?: OfferDocument[] };
   onClose: () => void;
   onConfirm: (selectedPriorityProductIds: string[] | null, freeTextProducts: string) => Promise<void>;
   loading: boolean;
+  deliveryDays: string[] | null;
 };
 
-function OrderModal({ offer, onClose, onConfirm, loading }: OrderModalProps) {
+function OrderModal({ offer, onClose, onConfirm, loading, deliveryDays }: OrderModalProps) {
   const [selectedPriorityProductIds, setSelectedPriorityProductIds] = useState<string[]>([]);
   const [error, setError] = useState('');
   const { user } = useAuth();
@@ -110,6 +113,14 @@ function OrderModal({ offer, onClose, onConfirm, loading }: OrderModalProps) {
             )}
           </div>
 
+          {/* Delivery days information */}
+          <div className="bg-blue-50 p-4 rounded-lg">
+            <h4 className="text-sm font-medium text-blue-800 mb-2">
+              Informations de livraison
+            </h4>
+            <DeliveryDaysDisplay deliveryDays={deliveryDays} />
+          </div>
+
           {offer.type === 'threshold' && (
             <div className="bg-amber-50 p-4 rounded-lg">
               <h4 className="text-sm font-medium text-amber-800 mb-2">Achats libres</h4>
@@ -135,7 +146,7 @@ function OrderModal({ offer, onClose, onConfirm, loading }: OrderModalProps) {
                   <li
                     key={product.id}
                     className="flex justify-between items-center text-sm cursor-pointer hover:bg-gray-100 rounded"
-                    onClick={() => navigate(`/medications/${product.medication_id}`)}  // ← ta route de détail
+                    onClick={() => navigate(`/medications/${product.medication_id}`)}
                   >
                     <div>
                       <span className="text-gray-800">
@@ -260,6 +271,9 @@ export function SpecialOffers() {
   const [success, setSuccess] = useState('');
   const [selectedOffer, setSelectedOffer] = useState<(ActiveOffer & { documents?: OfferDocument[] }) | null>(null);
   const [orderLoading, setOrderLoading] = useState(false);
+  const [selectedRegion, setSelectedRegion] = useState<RegionWithDeliveryDays | null>(null);
+  const [deliveryDaysMap, setDeliveryDaysMap] = useState<Record<string, string[] | null>>({});
+  const [loadingDeliveryDays, setLoadingDeliveryDays] = useState(false);
 
   useEffect(() => {
     fetchOffers();
@@ -275,6 +289,35 @@ export function SpecialOffers() {
       fetchSingleOffer(offerId);
     }
   }, [offerId]);
+
+  useEffect(() => {
+    if (selectedRegion) {
+      fetchDeliveryDaysForRegion();
+    } else {
+      setDeliveryDaysMap({});
+    }
+  }, [selectedRegion, allOffers]);
+
+  async function fetchDeliveryDaysForRegion() {
+    if (!selectedRegion) return;
+    
+    setLoadingDeliveryDays(true);
+    const newDeliveryDaysMap: Record<string, string[] | null> = {};
+    
+    try {
+      // For each offer, get the wholesaler's delivery days for the selected region
+      for (const offer of allOffers) {
+        const deliveryDays = await getDeliveryDays(offer.wholesaler_id, selectedRegion.id);
+        newDeliveryDaysMap[offer.wholesaler_id] = deliveryDays;
+      }
+      
+      setDeliveryDaysMap(newDeliveryDaysMap);
+    } catch (error) {
+      console.error('Error fetching delivery days:', error);
+    } finally {
+      setLoadingDeliveryDays(false);
+    }
+  }
 
   async function fetchSingleOffer(id: string) {
     try {
@@ -621,7 +664,7 @@ export function SpecialOffers() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-semibold text-gray-900">Offres spéciales</h2>
+        <h2 className="text-2xl font-semibold text-gray-900">Packs disponibles</h2>
       </div>
 
       {success && (
@@ -651,7 +694,7 @@ export function SpecialOffers() {
       )}
 
       <div className="bg-white shadow rounded-lg p-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
             <input
@@ -695,6 +738,11 @@ export function SpecialOffers() {
               Achats libres
             </button>
           </div>
+
+          <RegionSelector 
+            onRegionChange={setSelectedRegion}
+            selectedRegion={selectedRegion}
+          />
         </div>
       </div>
 
@@ -742,6 +790,12 @@ export function SpecialOffers() {
                       Du {formatDate(offer.start_date)} au {formatDate(offer.end_date)}
                     </span>
                   </div>
+                  
+                  {/* Display delivery days */}
+                  <DeliveryDaysDisplay 
+                    deliveryDays={deliveryDaysMap[offer.wholesaler_id]} 
+                    isLoading={loadingDeliveryDays}
+                  />
                 </div>
 
                 <div className="mb-4">
@@ -816,7 +870,10 @@ export function SpecialOffers() {
                 )}
 
                 <button
-                  onClick={() => handleOrderClick(offer)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleOrderClick(offer);
+                  }}
                   className="w-full mt-4 inline-flex justify-center items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                 >
                   <ShoppingCart className="h-4 w-4 mr-2" />
@@ -834,6 +891,7 @@ export function SpecialOffers() {
           onClose={() => setSelectedOffer(null)}
           onConfirm={(selectedPriorityProductIds, freeTextProducts) => handleOrderOffer(selectedPriorityProductIds, freeTextProducts)}
           loading={orderLoading}
+          deliveryDays={deliveryDaysMap[selectedOffer.wholesaler_id]}
         />
       )}
     </div>

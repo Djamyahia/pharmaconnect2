@@ -1,9 +1,5 @@
 {
   "rewrites": [
-    { "source": "/api/:path*", "destination": "/api/:path*" },
-    { "source": "/assets/:path*", "destination": "/assets/:path*" },
-    { "source": "/_next/static/:path*", "destination": "/_next/static/:path*" },
-    { "source": "/favicon.ico", "destination": "/favicon.ico" },
-    { "source": "/:path*", "destination": "/index.html" }
+    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

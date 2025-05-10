@@ -4,10 +4,14 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import Select from 'react-select';
 import { customStyles, selectComponents } from '../../components/VirtualizedSelect';
-import type { Medication, Promotion } from '../../types/supabase';
+import type { Medication, Promotion, RegionWithDeliveryDays } from '../../types/supabase';
 import { algerianWilayas } from '../../lib/wilayas';
 import { sendOrderNotification } from '../../lib/notifications';
 import { UserLink } from '../../components/UserLink';
+import { RegionSelector } from '../../components/RegionSelector';
+import { DeliveryDaysDisplay } from '../../components/DeliveryDaysDisplay';
+import { ExpiryDateDisplay } from '../../components/ExpiryDateDisplay';
+import { getDeliveryDays } from '../../lib/regions';
 
 export type ExtendedPromotion = Promotion & {
   medications: Medication;
@@ -24,9 +28,10 @@ type OrderModalProps = {
   onClose: () => void;
   onConfirm: (quantity: number) => void;
   loading: boolean;
+  deliveryDays: string[] | null;
 };
 
-function OrderModal({ promotion, onClose, onConfirm, loading }: OrderModalProps) {
+function OrderModal({ promotion, onClose, onConfirm, loading, deliveryDays }: OrderModalProps) {
   const [quantity, setQuantity] = useState(1);
   const [error, setError] = useState('');
 
@@ -61,6 +66,10 @@ function OrderModal({ promotion, onClose, onConfirm, loading }: OrderModalProps)
             <p className="text-sm font-medium text-green-600">
               {promotion.free_units_percentage}% UG
             </p>
+            <ExpiryDateDisplay expiryDate={promotion.expiry_date} />
+          </div>
+          <div className="mt-2">
+            <DeliveryDaysDisplay deliveryDays={deliveryDays} />
           </div>
         </div>
 
@@ -118,6 +127,9 @@ export function Promotions() {
   const [selectedWilaya, setSelectedWilaya] = useState<string>('');
   const [orderLoading, setOrderLoading] = useState<string | null>(null);
   const [selectedPromotion, setSelectedPromotion] = useState<ExtendedPromotion | null>(null);
+  const [selectedRegion, setSelectedRegion] = useState<RegionWithDeliveryDays | null>(null);
+  const [deliveryDaysMap, setDeliveryDaysMap] = useState<Record<string, string[] | null>>({});
+  const [loadingDeliveryDays, setLoadingDeliveryDays] = useState(false);
 
   useEffect(() => {
     const debounceTimer = setTimeout(() => {
@@ -129,9 +141,44 @@ export function Promotions() {
     return () => clearTimeout(debounceTimer);
   }, [user?.id, searchQuery, selectedWilaya]);
 
-  async function fetchPromotions() {
-    if (!user?.id) return;
+  useEffect(() => {
+    if (selectedRegion) {
+      fetchDeliveryDaysForRegion();
+    } else {
+      setDeliveryDaysMap({});
+    }
+  }, [selectedRegion]);
 
+  async function fetchDeliveryDaysForRegion() {
+    if (!selectedRegion) return;
+    
+    setLoadingDeliveryDays(true);
+    const newDeliveryDaysMap: Record<string, string[] | null> = {};
+    
+    try {
+      // Get all wholesalers
+      const { data: wholesalers, error: wholesalersError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('role', 'wholesaler');
+        
+      if (wholesalersError) throw wholesalersError;
+      
+      // For each wholesaler, get their delivery days for the selected region
+      for (const wholesaler of wholesalers || []) {
+        const deliveryDays = await getDeliveryDays(wholesaler.id, selectedRegion.id);
+        newDeliveryDaysMap[wholesaler.id] = deliveryDays;
+      }
+      
+      setDeliveryDaysMap(newDeliveryDaysMap);
+    } catch (error) {
+      console.error('Error fetching delivery days:', error);
+    } finally {
+      setLoadingDeliveryDays(false);
+    }
+  }
+
+  async function fetchPromotions() {
     try {
       let query = supabase
         .from('active_promotions_view')
@@ -149,18 +196,13 @@ export function Promotions() {
           )
         `);
 
-      
-
       if (searchQuery) {
-  // full-text search avec préfixe : match “searchQuery:*”
+        // full-text search avec préfixe : match "searchQuery:*"
         query = query.textSearch(
           'medications.search_vector',
           `${searchQuery}:*`
         );
       }
-
-
-
 
       const { data, error } = await query;
 
@@ -174,7 +216,7 @@ export function Promotions() {
   }
 
   async function handleOrder(promotion: ExtendedPromotion, quantity: number) {
-    if (!user?.id || !promotion.wholesaler) return;
+    if (!user?.id) return;
 
     try {
       setOrderLoading(promotion.id);
@@ -286,11 +328,11 @@ export function Promotions() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-semibold text-gray-900">Promotions actives</h2>
+        <h2 className="text-2xl font-semibold text-gray-900">Ventes Flash UG</h2>
       </div>
 
       <div className="bg-white shadow rounded-lg p-4 sm:p-6">
-        <div className="grid grid-cols-1 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
             <input
@@ -301,6 +343,11 @@ export function Promotions() {
               className="pl-10 pr-4 py-2 w-full border rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
             />
           </div>
+          
+          <RegionSelector 
+            onRegionChange={setSelectedRegion}
+            selectedRegion={selectedRegion}
+          />
         </div>
       </div>
 
@@ -327,6 +374,12 @@ export function Promotions() {
                   </th>
                   <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Statut
+                  </th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Expiration
+                  </th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Livraison
                   </th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Actions
@@ -376,6 +429,15 @@ export function Promotions() {
                           }
                         </span>
                       </td>
+                      <td className="px-4 py-4 text-center">
+                        <ExpiryDateDisplay expiryDate={promotion.expiry_date} />
+                      </td>
+                      <td className="px-4 py-4 text-center">
+                        <DeliveryDaysDisplay 
+                          deliveryDays={deliveryDaysMap[promotion.wholesaler_id]}
+                          isLoading={loadingDeliveryDays}
+                        />
+                      </td>
                       <td className="px-4 py-4 text-right">
                         <button
                           onClick={() => setSelectedPromotion(promotion)}
@@ -401,6 +463,7 @@ export function Promotions() {
           onClose={() => setSelectedPromotion(null)}
           onConfirm={(quantity) => handleOrder(selectedPromotion, quantity)}
           loading={orderLoading === selectedPromotion.id}
+          deliveryDays={deliveryDaysMap[selectedPromotion.wholesaler_id]}
         />
       )}
     </div>
