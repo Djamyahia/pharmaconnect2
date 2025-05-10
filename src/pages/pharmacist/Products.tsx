@@ -4,12 +4,16 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import Select from 'react-select';
 import { customStyles, selectComponents } from '../../components/VirtualizedSelect';
-import type { Medication, WholesalerInventory, ActiveOffer } from '../../types/supabase';
+import type { Medication, WholesalerInventory, ActiveOffer, Region, RegionWithDeliveryDays } from '../../types/supabase';
 import { algerianWilayas } from '../../lib/wilayas';
 import { sendOrderNotification } from '../../lib/notifications';
 import { ProductTypeNav } from '../../components/ProductTypeNav';
 import { UserLink } from '../../components/UserLink';
 import { Link } from 'react-router-dom';
+import { RegionSelector } from '../../components/RegionSelector';
+import { DeliveryDaysDisplay } from '../../components/DeliveryDaysDisplay';
+import { ExpiryDateDisplay } from '../../components/ExpiryDateDisplay';
+import { getDeliveryDays } from '../../lib/regions';
 
 type MedicationWithInventory = Medication & {
   wholesaler_inventory: (WholesalerInventory & {
@@ -44,9 +48,10 @@ type OrderModalProps = {
   onClose: () => void;
   onConfirm: (quantity: number) => void;
   loading: boolean;
+  deliveryDays: string[] | null;
 };
 
-function OrderModal({ medication, inventory, price, onClose, onConfirm, loading }: OrderModalProps) {
+function OrderModal({ medication, inventory, price, onClose, onConfirm, loading, deliveryDays }: OrderModalProps) {
   const [quantity, setQuantity] = useState(1);
   const [error, setError] = useState('');
   const [showAllWilayas, setShowAllWilayas] = useState(false);
@@ -72,7 +77,16 @@ function OrderModal({ medication, inventory, price, onClose, onConfirm, loading 
     if (!showAllWilayas && wilayaNames.length > 5) {
       return (
         <div className="space-y-1">
-          <div>{wilayaNames.slice(0, 5).join(', ')}</div>
+          <div className="flex flex-wrap gap-1">
+            {wilayaNames.slice(0, 5).map((name, index) => (
+              <span
+                key={index}
+                className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800"
+              >
+                {name}
+              </span>
+            ))}
+          </div>
           <button
             type="button"
             onClick={(e) => {
@@ -139,8 +153,12 @@ function OrderModal({ medication, inventory, price, onClose, onConfirm, loading 
           <div className="mt-2">
             <p className="text-sm text-gray-500">Stock disponible : {inventory.quantity} unités</p>
             <p className="text-sm font-medium text-gray-900">Prix unitaire : {inventory.price.toFixed(2)} DZD</p>
+            <ExpiryDateDisplay expiryDate={inventory.expiry_date} />
           </div>
           
+          <div className="mt-2">
+            <DeliveryDaysDisplay deliveryDays={deliveryDays} />
+          </div>
         </div>
 
         {error && (
@@ -227,6 +245,9 @@ export function Products() {
   });
   const [orderLoading, setOrderLoading] = useState(false);
   const [offers, setOffers] = useState<ActiveOffer[]>([]);
+  const [selectedRegion, setSelectedRegion] = useState<RegionWithDeliveryDays | null>(null);
+  const [deliveryDaysMap, setDeliveryDaysMap] = useState<Record<string, string[] | null>>({});
+  const [loadingDeliveryDays, setLoadingDeliveryDays] = useState(false);
 
   useEffect(() => {
     if (user?.id) {
@@ -244,6 +265,43 @@ export function Products() {
 
     return () => clearTimeout(debounceTimer);
   }, [searchQuery, selectedWilaya]);
+
+  useEffect(() => {
+    if (selectedRegion) {
+      fetchDeliveryDaysForRegion();
+    } else {
+      setDeliveryDaysMap({});
+    }
+  }, [selectedRegion]);
+
+  async function fetchDeliveryDaysForRegion() {
+    if (!selectedRegion) return;
+    
+    setLoadingDeliveryDays(true);
+    const newDeliveryDaysMap: Record<string, string[] | null> = {};
+    
+    try {
+      // Get all wholesalers
+      const { data: wholesalers, error: wholesalersError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('role', 'wholesaler');
+        
+      if (wholesalersError) throw wholesalersError;
+      
+      // For each wholesaler, get their delivery days for the selected region
+      for (const wholesaler of wholesalers || []) {
+        const deliveryDays = await getDeliveryDays(wholesaler.id, selectedRegion.id);
+        newDeliveryDaysMap[wholesaler.id] = deliveryDays;
+      }
+      
+      setDeliveryDaysMap(newDeliveryDaysMap);
+    } catch (error) {
+      console.error('Error fetching delivery days:', error);
+    } finally {
+      setLoadingDeliveryDays(false);
+    }
+  }
 
   async function fetchOffers() {
     try {
@@ -345,72 +403,71 @@ export function Products() {
   }
 
   async function createOrder(
-  medication: MedicationWithInventory,
-  inventory: WholesalerInventory & { users: { company_name: string; wilaya: string; email: string } },
-  quantity: number
-) {
-  if (!user?.id) {
-    alert('Veuillez vous connecter pour passer des commandes.');
-    return;
-  }
-
-  try {
-    setOrderLoading(true);
-
-    const { data: orderData, error: orderError } = await supabase
-      .from('orders')
-      .insert({
-        pharmacist_id: user.id,
-        wholesaler_id: inventory.wholesaler_id,
-        total_amount: inventory.price * quantity,
-        status: 'pending'
-      })
-      .select()
-      .single();
-
-    if (orderError) throw orderError;
-
-    const { error: itemError } = await supabase
-      .from('order_items')
-      .insert({
-        order_id: orderData.id,
-        medication_id: medication.id,
-        quantity: quantity,
-        unit_price: inventory.price
-      });
-
-    if (itemError) throw itemError;
-
-    try {
-      await sendOrderNotification(
-        'order_placed',
-        inventory.users.email,
-        {
-          wholesaler_name: inventory.users.company_name,
-          pharmacist_name: user.company_name,
-          order_id: orderData.id,
-          product_name: medication.commercial_name,
-          product_form: medication.form,
-          product_dosage: medication.dosage,
-          quantity: `${quantity}`,
-          unit_price: `${inventory.price}`,
-          total_amount: `${(inventory.price * quantity).toFixed(2)} DZD`
-        }
-      );
-    } catch (emailError) {
-      console.error('Failed to send email notification:', emailError);
+    medication: MedicationWithInventory,
+    inventory: WholesalerInventory & { users: { company_name: string; wilaya: string; email: string } },
+    quantity: number
+  ) {
+    if (!user?.id) {
+      alert('Veuillez vous connecter pour passer des commandes.');
+      return;
     }
 
-    alert('Commande créée avec succès !');
-    setOrderModal({ show: false, medication: null, inventory: null, price: 0 });
-  } catch (error) {
-    console.error('Error creating order:', error);
-    alert('Échec de la création de la commande. Veuillez réessayer.');
-  } finally {
-    setOrderLoading(false);
-  }
-}
+    try {
+      setOrderLoading(true);
 
+      const { data: orderData, error: orderError } = await supabase
+        .from('orders')
+        .insert({
+          pharmacist_id: user.id,
+          wholesaler_id: inventory.wholesaler_id,
+          total_amount: inventory.price * quantity,
+          status: 'pending'
+        })
+        .select()
+        .single();
+
+      if (orderError) throw orderError;
+
+      const { error: itemError } = await supabase
+        .from('order_items')
+        .insert({
+          order_id: orderData.id,
+          medication_id: medication.id,
+          quantity: quantity,
+          unit_price: inventory.price
+        });
+
+      if (itemError) throw itemError;
+
+      try {
+        await sendOrderNotification(
+          'order_placed',
+          inventory.users.email,
+          {
+            wholesaler_name: inventory.users.company_name,
+            pharmacist_name: user.company_name,
+            order_id: orderData.id,
+            product_name: medication.commercial_name,
+            product_form: medication.form,
+            product_dosage: medication.dosage,
+            quantity: `${quantity}`,
+            unit_price: `${inventory.price}`,
+            total_amount: `${(inventory.price * quantity).toFixed(2)} DZD`
+          }
+        );
+      } catch (emailError) {
+        console.error('Failed to send email notification:', emailError);
+      }
+
+      alert('Commande créée avec succès !');
+      setOrderModal({ show: false, medication: null, inventory: null, price: 0 });
+    } catch (error) {
+      console.error('Error creating order:', error);
+      alert('Échec de la création de la commande. Veuillez réessayer.');
+    } finally {
+      setOrderLoading(false);
+    }
+  }
 
   if (loading) {
     return (
@@ -424,7 +481,7 @@ export function Products() {
     <div className="space-y-6">
       <ProductTypeNav />
       <div className="bg-white shadow rounded-lg p-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
             <input
@@ -448,6 +505,11 @@ export function Products() {
               components={selectComponents}
             />
           </div>
+
+          <RegionSelector 
+            onRegionChange={setSelectedRegion}
+            selectedRegion={selectedRegion}
+          />
         </div>
       </div>
 
@@ -507,12 +569,12 @@ export function Products() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {medication.wholesaler_inventory.map((inventory) => {
                         const promoKey        = `${inventory.wholesaler_id}-${medication.id}`;
-       const activePromotion = promotionsMap[promoKey];
-       // on récupère aussi les packs valides pour CE grossiste
-       const packOffers = offers.filter(offer =>
-         offer.wholesaler_id === inventory.wholesaler_id        
-         && offer.products.some(p => p.medication_id === medication.id)
-       );
+                        const activePromotion = promotionsMap[promoKey];
+                        // on récupère aussi les packs valides pour CE grossiste
+                        const packOffers = offers.filter(offer =>
+                          offer.wholesaler_id === inventory.wholesaler_id        
+                          && offer.products.some(p => p.medication_id === medication.id)
+                        );
                         
                         return (
                           <div
@@ -520,48 +582,48 @@ export function Products() {
                             className="flex flex-col p-4 bg-white border rounded-lg shadow-sm hover:shadow-md transition-shadow"
                           >
                             <div className="flex items-start justify-between">
-      <div className="flex items-start space-x-3">
-        <div className="flex-1">
-          <p className="font-medium text-gray-900">
-            <UserLink user={inventory.users} />
-          </p>
-          
-          {/* — Packs sous le nom, alignés à gauche — */}
-          {packOffers.length > 0 && (
-            <div className="mt-2 text-left">
-              <span className="text-sm font-medium text-gray-500">Disponible dans un Pack :</span>
-              <div className="flex flex-wrap gap-2 mt-1">
-                {packOffers.map(pack => (
-                  <Link
-    key={pack.id}
-    to={`/pharmacist/offers/${pack.id}`}
-    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-      ${
-        pack.type === 'pack'
-          ? 'bg-red-100 text-orange-800 hover:bg-orange-200'    // pack fixe → vert
-          : 'bg-blue-100 text-blue-800 hover:bg-blue-200'       // achat libre/seuil → bleu
-      }
-    `}
-  >
-    {pack.name}
-  </Link>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
+                              <div className="flex items-start space-x-3">
+                                <div className="flex-1">
+                                  <p className="font-medium text-gray-900">
+                                    <UserLink user={inventory.users} />
+                                  </p>
+                                  
+                                  {/* — Packs sous le nom, alignés à gauche — */}
+                                  {packOffers.length > 0 && (
+                                    <div className="mt-2 text-left">
+                                      <span className="text-sm font-medium text-gray-500">Disponible dans un Pack :</span>
+                                      <div className="flex flex-wrap gap-2 mt-1">
+                                        {packOffers.map(pack => (
+                                          <Link
+                                            key={pack.id}
+                                            to={`/pharmacist/offers/${pack.id}`}
+                                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                              ${
+                                                pack.type === 'pack'
+                                                  ? 'bg-red-100 text-orange-800 hover:bg-orange-200'    // pack fixe → vert
+                                                  : 'bg-blue-100 text-blue-800 hover:bg-blue-200'       // achat libre/seuil → bleu
+                                              }
+                                            `}
+                                          >
+                                            {pack.name}
+                                          </Link>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
 
-      {/* Badge promo à droite */}
-      {activePromotion && (
-        <Link
-          to="/pharmacist/promotions"
-          className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 hover:bg-green-200"
-        >
-          Existe en vente flash {activePromotion.free_units_percentage}% UG
-        </Link>
-      )}
-    </div>
+                              {/* Badge promo à droite */}
+                              {activePromotion && (
+                                <Link
+                                  to="/pharmacist/promotions"
+                                  className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 hover:bg-green-200"
+                                >
+                                  Existe en vente flash {activePromotion.free_units_percentage}% UG
+                                </Link>
+                              )}
+                            </div>
 
                             
                             
@@ -573,6 +635,11 @@ export function Products() {
                                 <p className="text-sm text-gray-600">
                                   Stock : {inventory.quantity} unités
                                 </p>
+                                <ExpiryDateDisplay expiryDate={inventory.expiry_date} />
+                                <DeliveryDaysDisplay 
+                                  deliveryDays={deliveryDaysMap[inventory.wholesaler_id]} 
+                                  isLoading={loadingDeliveryDays}
+                                />
                               </div>
                               <button
                                 onClick={() => setOrderModal({
@@ -608,6 +675,7 @@ export function Products() {
           onClose={() => setOrderModal({ show: false, medication: null, inventory: null, price: 0 })}
           onConfirm={(quantity) => createOrder(orderModal.medication!, orderModal.inventory!, quantity)}
           loading={orderLoading}
+          deliveryDays={deliveryDaysMap[orderModal.inventory.wholesaler_id]}
         />
       )}
     </div>

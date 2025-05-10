@@ -5,8 +5,14 @@ import { useAuth } from '../../contexts/AuthContext';
 import Select from 'react-select';
 import { customStyles, selectComponents } from '../../components/VirtualizedSelect';
 import type { Medication, Promotion } from '../../types/supabase';
+import { RegionSelector } from '../../components/RegionSelector';
+import { DeliveryDaysDisplay } from '../../components/DeliveryDaysDisplay';
+import { ExpiryDateDisplay } from '../../components/ExpiryDateDisplay';
+import { getDeliveryDays } from '../../lib/regions';
+import type { RegionWithDeliveryDays } from '../../types/supabase';
+import { UserLink } from '../../components/UserLink';
 
-type ExtendedPromotion = Promotion & {
+export type ExtendedPromotion = Promotion & {
   medications: Medication;
   wholesaler: {
     company_name: string;
@@ -19,6 +25,7 @@ type EditingPromotion = {
   free_units_percentage: number;
   start_date: string;
   end_date: string;
+  expiry_date: string | null;
 };
 
 export function Promotions() {
@@ -31,23 +38,72 @@ export function Promotions() {
   const [editingPromotion, setEditingPromotion] = useState<EditingPromotion | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedWilaya, setSelectedWilaya] = useState('');
+  const [orderLoading, setOrderLoading] = useState<string | null>(null);
+  const [selectedPromotion, setSelectedPromotion] = useState<ExtendedPromotion | null>(null);
+  const [selectedRegion, setSelectedRegion] = useState<RegionWithDeliveryDays | null>(null);
+  const [deliveryDaysMap, setDeliveryDaysMap] = useState<Record<string, string[] | null>>({});
+  const [loadingDeliveryDays, setLoadingDeliveryDays] = useState(false);
+  const [selectedMedication, setSelectedMedication] = useState<{ id: string; commercial_name: string } | null>(null);
   const [newPromotion, setNewPromotion] = useState({
     medication_id: '',
     free_units_percentage: 0,
     start_date: '',
     end_date: '',
+    expiry_date: null as string | null,
   });
-  const [selectedMedication, setSelectedMedication] = useState<{
-    id: string;
-    commercial_name: string;
-  } | null>(null);
+
+  useEffect(() => {
+    const debounceTimer = setTimeout(() => {
+      if (user?.id) {
+        fetchPromotions();
+      }
+    }, 300);
+
+    return () => clearTimeout(debounceTimer);
+  }, [user?.id, searchQuery, selectedWilaya]);
 
   useEffect(() => {
     if (user?.id) {
-      fetchPromotions();
       fetchAvailableMedications();
     }
   }, [user?.id]);
+
+  useEffect(() => {
+    if (selectedRegion) {
+      fetchDeliveryDaysForRegion();
+    } else {
+      setDeliveryDaysMap({});
+    }
+  }, [selectedRegion]);
+
+  async function fetchDeliveryDaysForRegion() {
+    if (!selectedRegion) return;
+    
+    setLoadingDeliveryDays(true);
+    const newDeliveryDaysMap: Record<string, string[] | null> = {};
+    
+    try {
+      // Get all wholesalers
+      const { data: wholesalers, error: wholesalersError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('role', 'wholesaler');
+        
+      if (wholesalersError) throw wholesalersError;
+      
+      // For each wholesaler, get their delivery days for the selected region
+      for (const wholesaler of wholesalers || []) {
+        const deliveryDays = await getDeliveryDays(wholesaler.id, selectedRegion.id);
+        newDeliveryDaysMap[wholesaler.id] = deliveryDays;
+      }
+      
+      setDeliveryDaysMap(newDeliveryDaysMap);
+    } catch (error) {
+      console.error('Error fetching delivery days:', error);
+    } finally {
+      setLoadingDeliveryDays(false);
+    }
+  }
 
   async function fetchAvailableMedications() {
     try {
@@ -87,21 +143,26 @@ export function Promotions() {
         .from('active_promotions_view')
         .select(`
           *,
-          medications (*),
+          medications!inner (
+            *,
+            search_vector
+          ),
           wholesaler:users!promotions_wholesaler_id_fkey (
             company_name,
-            wilaya
+            wilaya,
+            email,
+            delivery_wilayas
           )
         `)
         .eq('wholesaler_id', user.id)
         .order('start_date', { ascending: true });
 
       if (searchQuery) {
-        query = query.textSearch('medications.search_vector', searchQuery);
-      }
-
-      if (selectedWilaya) {
-        query = query.eq('wholesaler.delivery_wilayas', selectedWilaya);
+        // full-text search avec préfixe : match "searchQuery:*"
+        query = query.textSearch(
+          'medications.search_vector',
+          `${searchQuery}:*`
+        );
       }
 
       const { data, error } = await query;
@@ -109,7 +170,7 @@ export function Promotions() {
       if (error) throw error;
       setPromotions(data || []);
     } catch (error) {
-      console.error('Error fetching promotions:', error);
+      console.error('Erreur lors de la récupération des promotions:', error);
     } finally {
       setLoading(false);
     }
@@ -145,7 +206,8 @@ export function Promotions() {
         .update({
           free_units_percentage: editingPromotion.free_units_percentage,
           start_date: editingPromotion.start_date,
-          end_date: editingPromotion.end_date
+          end_date: editingPromotion.end_date,
+          expiry_date: editingPromotion.expiry_date
         })
         .eq('id', id);
 
@@ -258,7 +320,8 @@ export function Promotions() {
           wholesaler_id: user?.id,
           free_units_percentage: newPromotion.free_units_percentage,
           start_date: newPromotion.start_date,
-          end_date: newPromotion.end_date
+          end_date: newPromotion.end_date,
+          expiry_date: newPromotion.expiry_date
         });
 
       if (promotionError) throw promotionError;
@@ -270,6 +333,7 @@ export function Promotions() {
         free_units_percentage: 0,
         start_date: '',
         end_date: '',
+        expiry_date: null,
       });
       fetchPromotions();
     } catch (error) {
@@ -310,13 +374,13 @@ export function Promotions() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-semibold text-gray-900">Gestion des promotions</h2>
+        <h2 className="text-2xl font-semibold text-gray-900">Gestion des ventes flash UG</h2>
         <button
           onClick={() => setShowAddForm(true)}
           className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
         >
           <Plus className="h-5 w-5 mr-2" />
-          Nouvelle promotion
+          Nouvelle vente flash
         </button>
       </div>
 
@@ -332,6 +396,11 @@ export function Promotions() {
               className="pl-10 pr-4 py-2 w-full border rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
             />
           </div>
+          
+          <RegionSelector 
+            onRegionChange={setSelectedRegion}
+            selectedRegion={selectedRegion}
+          />
         </div>
       </div>
 
@@ -343,158 +412,193 @@ export function Promotions() {
         </div>
       ) : (
         <div className="bg-white shadow rounded-lg overflow-hidden">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/4">
-                  Médicament
-                </th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[20%]">
-                  Promotion
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[20%]">
-                  Période
-                </th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[12%]">
-                  Statut
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-[8%]">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {promotions.map((promotion) => {
-                const isActive = isPromotionActive(promotion);
-                
-                return (
-                  <tr key={promotion.id}>
-                    <td className="px-6 py-4">
-                      <div className="text-sm font-medium text-gray-900 truncate max-w-xs">
-                        {promotion.medications.commercial_name}
-                      </div>
-                      <div className="text-sm text-gray-500 truncate max-w-xs">
-                        {promotion.medications.form} - {promotion.medications.dosage}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      {editingPromotion?.id === promotion.id ? (
-                        <input
-                          type="number"
-                          min="0.01"
-                          max="100"
-                          step="0.01"
-                          value={editingPromotion.free_units_percentage}
-                          onChange={(e) => setEditingPromotion({
-                            ...editingPromotion,
-                            free_units_percentage: parseFloat(e.target.value)
-                          })}
-                          className="w-24 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                        />
-                      ) : (
-                        <span className="text-sm font-medium text-gray-900">
-                          {promotion.free_units_percentage}% UG
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {editingPromotion?.id === promotion.id ? (
-                        <div className="space-y-2">
-                          <div>
-                            <label className="block text-xs text-gray-500">Début</label>
-                            <input
-                              type="date"
-                              value={editingPromotion.start_date.split('T')[0]}
-                              onChange={(e) => setEditingPromotion({
-                                ...editingPromotion,
-                                start_date: e.target.value
-                              })}
-                              className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs text-gray-500">Fin</label>
-                            <input
-                              type="date"
-                              value={editingPromotion.end_date.split('T')[0]}
-                              onChange={(e) => setEditingPromotion({
-                                ...editingPromotion,
-                                end_date: e.target.value
-                              })}
-                              className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                            />
-                          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200 ">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Médicament
+                  </th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Promotion
+                  </th>
+                  <th className="hidden sm:table-cell px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Période
+                  </th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Statut
+                  </th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Expiration
+                  </th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Livraison
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {promotions.map((promotion) => {
+                  const isActive = isPromotionActive(promotion);
+                  
+                  return (
+                    <tr key={promotion.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-4">
+                        <div className="text-sm font-medium text-gray-900 break-words">
+                          {promotion.medications.commercial_name}
                         </div>
-                      ) : (
-                        <>
-                          <div>Du {formatDate(promotion.start_date)}</div>
-                          <div>au {formatDate(promotion.end_date)}</div>
-                        </>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-center">
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                        isActive 
-                          ? 'bg-green-100 text-green-800'
-                          : new Date() < new Date(promotion.start_date)
-                            ? 'bg-yellow-100 text-yellow-800'
-                            : 'bg-red-100 text-red-800'
-                      }`}>
-                        {isActive 
-                          ? 'Active'
-                          : new Date() < new Date(promotion.start_date)
-                            ? 'À venir'
-                            : 'Terminée'
-                        }
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      {editingPromotion?.id === promotion.id ? (
-                        <div className="flex justify-end space-x-2">
-                          <button
-                            onClick={() => handleUpdatePromotion(promotion.id)}
-                            className="text-green-600 hover:text-green-900"
-                            title="Enregistrer"
-                          >
-                            <Save className="h-5 w-5" />
-                          </button>
-                          <button
-                            onClick={() => setEditingPromotion(null)}
-                            className="text-gray-600 hover:text-gray-900"
-                            title="Annuler"
-                          >
-                            <X className="h-5 w-5" />
-                          </button>
+                        <div className="text-sm text-gray-500 break-words">
+                          {promotion.medications.form} - {promotion.medications.dosage}
                         </div>
-                      ) : (
-                        <div className="flex justify-end space-x-2">
-                          <button
-                            onClick={() => setEditingPromotion({
-                              id: promotion.id,
-                              free_units_percentage: promotion.free_units_percentage,
-                              start_date: promotion.start_date.split('T')[0],
-                              end_date: promotion.end_date.split('T')[0],
+                        <div className="text-sm font-medium text-gray-900">
+                          <UserLink user={promotion.wholesaler} />
+                        </div>
+                        
+                      </td>
+                      <td className="px-4 py-4 text-center">
+                        {editingPromotion?.id === promotion.id ? (
+                          <input
+                            type="number"
+                            min="0.01"
+                            max="100"
+                            step="0.01"
+                            value={editingPromotion.free_units_percentage}
+                            onChange={(e) => setEditingPromotion({
+                              ...editingPromotion,
+                              free_units_percentage: parseFloat(e.target.value)
                             })}
-                            className="text-indigo-600 hover:text-indigo-900"
-                            title="Modifier"
-                          >
-                            <Edit2 className="h-5 w-5" />
-                          </button>
-                          <button
-                            onClick={() => handleDeletePromotion(promotion.id)}
-                            className="text-red-600 hover:text-red-900"
-                            title="Supprimer"
-                          >
-                            <Trash2 className="h-5 w-5" />
-                          </button>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                            className="w-24 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                          />
+                        ) : (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            {promotion.free_units_percentage}% UG
+                          </span>
+                        )}
+                      </td>
+                      <td className="hidden sm:table-cell px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {editingPromotion?.id === promotion.id ? (
+                          <div className="space-y-2">
+                            <div>
+                              <label className="block text-xs text-gray-500">Début</label>
+                              <input
+                                type="date"
+                                value={editingPromotion.start_date.split('T')[0]}
+                                onChange={(e) => setEditingPromotion({
+                                  ...editingPromotion,
+                                  start_date: e.target.value
+                                })}
+                                className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-gray-500">Fin</label>
+                              <input
+                                type="date"
+                                value={editingPromotion.end_date.split('T')[0]}
+                                onChange={(e) => setEditingPromotion({
+                                  ...editingPromotion,
+                                  end_date: e.target.value
+                                })}
+                                className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                              />
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <div>Du {formatDate(promotion.start_date)}</div>
+                            <div>au {formatDate(promotion.end_date)}</div>
+                          </>
+                        )}
+                      </td>
+                      <td className="px-4 py-4 text-center">
+                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                          isActive 
+                            ? 'bg-green-100 text-green-800'
+                            : new Date() < new Date(promotion.start_date)
+                              ? 'bg-yellow-100 text-yellow-800'
+                              : 'bg-red-100 text-red-800'
+                        }`}>
+                          {isActive 
+                            ? 'Active'
+                            : new Date() < new Date(promotion.start_date)
+                              ? 'À venir'
+                              : 'Terminée'
+                          }
+                        </span>
+                      </td>
+                      <td className="px-4 py-4 text-center">
+                        {editingPromotion?.id === promotion.id ? (
+                          <input
+                            type="date"
+                            value={editingPromotion.expiry_date || ''}
+                            min={new Date().toISOString().split('T')[0]}
+                            onChange={(e) => setEditingPromotion({
+                              ...editingPromotion,
+                              expiry_date: e.target.value || null
+                            })}
+                            className="w-40 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                          />
+                        ) : (
+                          <ExpiryDateDisplay expiryDate={promotion.expiry_date} />
+                        )}
+                      </td>
+                      <td className="px-4 py-4 text-center">
+                        <DeliveryDaysDisplay 
+                          deliveryDays={deliveryDaysMap[promotion.wholesaler_id]}
+                          isLoading={loadingDeliveryDays}
+                        />
+                      </td>
+                      <td className="px-4 py-4 text-right">
+                        {editingPromotion?.id === promotion.id ? (
+                          <div className="flex justify-end space-x-2">
+                            <button
+                              onClick={() => handleUpdatePromotion(promotion.id)}
+                              className="text-green-600 hover:text-green-900"
+                              title="Enregistrer"
+                            >
+                              <Save className="h-5 w-5" />
+                            </button>
+                            <button
+                              onClick={() => setEditingPromotion(null)}
+                              className="text-gray-600 hover:text-gray-900"
+                              title="Annuler"
+                            >
+                              <X className="h-5 w-5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex justify-end space-x-2">
+                            <button
+                              onClick={() => setEditingPromotion({
+                                id: promotion.id,
+                                free_units_percentage: promotion.free_units_percentage,
+                                start_date: promotion.start_date.split('T')[0],
+                                end_date: promotion.end_date.split('T')[0],
+                                expiry_date: promotion.expiry_date || null
+                              })}
+                              className="text-indigo-600 hover:text-indigo-900"
+                              title="Modifier"
+                            >
+                              <Edit2 className="h-5 w-5" />
+                            </button>
+                            <button
+                              onClick={() => handleDeletePromotion(promotion.id)}
+                              className="text-red-600 hover:text-red-900"
+                              title="Supprimer"
+                            >
+                              <Trash2 className="h-5 w-5" />
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
@@ -606,6 +710,22 @@ export function Promotions() {
                     Veuillez d'abord sélectionner une date de début
                   </p>
                 )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Date d'expiration (optionnelle)
+                </label>
+                <input
+                  type="date"
+                  value={newPromotion.expiry_date || ''}
+                  min={new Date().toISOString().split('T')[0]}
+                  onChange={(e) => setNewPromotion({ ...newPromotion, expiry_date: e.target.value || null })}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Format: MM/YYYY. Laissez vide si non applicable.
+                </p>
               </div>
 
               <div className="flex justify-end space-x-3 pt-4">

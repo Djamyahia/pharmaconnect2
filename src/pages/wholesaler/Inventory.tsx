@@ -9,6 +9,7 @@ import { algerianWilayas } from '../../lib/wilayas';
 import * as XLSX from 'xlsx';
 import * as unorm from 'unorm';
 import stringSimilarity from 'string-similarity';
+import { ExpiryDateDisplay } from '../../components/ExpiryDateDisplay';
 
 type ExtendedInventoryItem = WholesalerInventory & {
   medications: Medication | null;
@@ -22,6 +23,7 @@ type EditingItem = {
   quantity: number;
   price: number;
   delivery_wilayas: string[];
+  expiry_date: string | null;
 };
 
 export function Inventory() {
@@ -43,6 +45,7 @@ export function Inventory() {
     quantity: 0,
     price: 0,
     delivery_wilayas: [] as string[],
+    expiry_date: null as string | null,
   });
 
   useEffect(() => {
@@ -175,6 +178,7 @@ export function Inventory() {
         quantity: item.quantity,
         price: item.price,
         delivery_wilayas: user?.delivery_wilayas || item.delivery_wilayas,
+        expiry_date: item.expiry_date
       });
   
       if (insertError) {
@@ -194,6 +198,7 @@ export function Inventory() {
           quantity: item.quantity,
           price: item.price,
           delivery_wilayas: user?.delivery_wilayas || item.delivery_wilayas,
+          expiry_date: item.expiry_date,
           medications: medication,
           isUnmatched: false
         };
@@ -247,6 +252,7 @@ export function Inventory() {
         quantity: 0,
         price: 0,
         delivery_wilayas: user?.delivery_wilayas || [],
+        expiry_date: null,
       });
       setError('');
       fetchInventory();
@@ -266,6 +272,7 @@ export function Inventory() {
           quantity: editingItem.quantity,
           price: editingItem.price,
           delivery_wilayas: editingItem.delivery_wilayas,
+          expiry_date: editingItem.expiry_date
         })
         .eq('id', id);
 
@@ -279,16 +286,16 @@ export function Inventory() {
   }
 
   async function handleDeleteItem(id: string) {
-  // 1️⃣ Si c’est un élément “unmatched” (chargé en mémoire, pas en base) :
+    // 1️⃣ Si c'est un élément "unmatched" (chargé en mémoire, pas en base) :
     const isUnmatched = uploadedItems.some(i => i.id === id);
     if (isUnmatched) {
-      // on le retire simplement des deux listes d’état
+      // on le retire simplement des deux listes d'état
       setUploadedItems(prev => prev.filter(i => i.id !== id));
       setInventory(prev => prev.filter(i => i.id !== id));
       return; // on sort, pas de requête Supabase
     }
   
-    // 2️⃣ Sinon, c’est un vrai enregistrement en base : on supprime dans Supabase
+    // 2️⃣ Sinon, c'est un vrai enregistrement en base : on supprime dans Supabase
     if (!confirm('Êtes-vous sûr·e de vouloir supprimer cet article définitivement ?')) {
       return;
     }
@@ -300,14 +307,13 @@ export function Inventory() {
   
       if (error) throw error;
   
-      // et on recharge l’inventaire
+      // et on recharge l'inventaire
       fetchInventory();
     } catch (error) {
       console.error('Error deleting inventory item:', error);
       alert('Échec de la suppression. Veuillez réessayer.');
     }
   }
-
 
   const normalize = (str: string) => {
     if (!str) return '';
@@ -364,15 +370,14 @@ export function Inventory() {
     if (!file || !user?.id) return;
 
     // 2.a) Demander le mode d'import
-    // 1) Demande à l’utilisateur
+    // 1) Demande à l'utilisateur
     const shouldReplace = window.confirm(
-      'Voulez-vous **remplacer** tout l’inventaire existant ?\n' +
+      'Voulez-vous **remplacer** tout l\'inventaire existant ?\n' +
       'OK = remplacer, Annuler = ajouter seulement les produits du fichier.'
     );
     
     setUploadLoading(true);
     setError('');
-
 
     try {
       const data = await file.arrayBuffer();
@@ -398,6 +403,7 @@ export function Inventory() {
         const rowDosage = normalize(row.dosage || '');
         const rowCOND = normalize(row.COND || '');
         const rowLaboratory = normalize(row.laboratory || '');
+        const rowExpiryDate = row.expiry_date || null;
 
         const match = medications.find(m => {
           const medCommercialName = normalize(m.commercial_name);
@@ -423,6 +429,7 @@ export function Inventory() {
             quantity: parseInt(row.quantity) || 0,
             price: parseFloat(row.price) || 0,
             delivery_wilayas: user.delivery_wilayas,
+            expiry_date: rowExpiryDate
           };
 
           itemsToInsert.push(item);
@@ -440,6 +447,7 @@ export function Inventory() {
             quantity: parseInt(row.quantity) || 0,
             price: parseFloat(row.price) || 0,
             delivery_wilayas: user.delivery_wilayas,
+            expiry_date: rowExpiryDate,
             medications: null,
             isUnmatched: true,
             originalRow: row,
@@ -448,7 +456,6 @@ export function Inventory() {
         }
       }
 
-    
       if (shouldReplace) {
         const { error: deleteError } = await supabase
           .from('wholesaler_inventory')
@@ -456,7 +463,6 @@ export function Inventory() {
           .eq('wholesaler_id', user.id);
         if (deleteError) throw deleteError;
       }
-
 
       if (itemsToInsert.length > 0) {
         const { error: insertError } = await supabase
@@ -475,7 +481,7 @@ export function Inventory() {
       if (shouldReplace) {
         alert('✅ Inventaire entièrement remplacé avec succès. Veuillez corriger les éléments non reconnus');
       } else {
-        alert('✅ Nouveaux produits ajoutés à l’inventaire existant. Veuillez corriger les éléments non reconnus');
+        alert('✅ Nouveaux produits ajoutés à l\'inventaire existant. Veuillez corriger les éléments non reconnus');
       }
     } catch (error: any) {
       console.error('Error uploading inventory:', error);
@@ -496,7 +502,8 @@ export function Inventory() {
           COND: 'PDRE. P. SOL. BUV. SACH.-DOSE',
           laboratory: 'SANOFI AVENTIS ALGERIE SPA',
           quantity: 100,
-          price: 1000.00
+          price: 1000.00,
+          expiry_date: '2025-12-31'
         }
       ];
 
@@ -516,7 +523,8 @@ export function Inventory() {
       id: item.id,
       quantity: item.quantity,
       price: item.price,
-      delivery_wilayas: item.delivery_wilayas
+      delivery_wilayas: item.delivery_wilayas,
+      expiry_date: item.expiry_date || null
     });
   };
 
@@ -624,7 +632,9 @@ export function Inventory() {
                 <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Prix
                 </th>
-                
+                <th scope="col" className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Date d'expiration
+                </th>
                 <th scope="col" className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
                 </th>
@@ -701,7 +711,22 @@ export function Inventory() {
                       <span className="text-sm text-gray-900">{item.price.toFixed(2)} DZD</span>
                     )}
                   </td>
-                  
+                  <td className="px-4 py-4 text-center whitespace-nowrap">
+                    {editingItem?.id === item.id ? (
+                      <input
+                        type="date"
+                        value={editingItem.expiry_date || ''}
+                        min={new Date().toISOString().split('T')[0]}
+                        onChange={(e) => setEditingItem({
+                          ...editingItem,
+                          expiry_date: e.target.value || null
+                        })}
+                        className="w-40 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                      />
+                    ) : (
+                      <ExpiryDateDisplay expiryDate={item.expiry_date} />
+                    )}
+                  </td>
                   <td className="px-4 py-4 text-center">
                     {editingItem?.id === item.id ? (
                       <div className="flex justify-center space-x-2">
@@ -823,6 +848,22 @@ export function Inventory() {
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                   required
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Date d'expiration (optionnelle)
+                </label>
+                <input
+                  type="date"
+                  value={newItem.expiry_date || ''}
+                  min={new Date().toISOString().split('T')[0]}
+                  onChange={(e) => setNewItem({ ...newItem, expiry_date: e.target.value || null })}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Format: MM/YYYY. Laissez vide si non applicable.
+                </p>
               </div>
 
               <div>

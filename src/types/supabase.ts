@@ -78,6 +78,7 @@ export type WholesalerInventory = {
   delivery_wilayas: string[];
   created_at: string;
   updated_at: string;
+  expiry_date?: string | null;
 };
 
 export type Promotion = {
@@ -88,6 +89,7 @@ export type Promotion = {
   start_date: string;
   end_date: string;
   created_at: string;
+  expiry_date?: string | null;
 };
 
 export type Order = {
@@ -167,6 +169,7 @@ export type PromotionalOffer = {
   comment?: string | null;
   max_quota_selections?: number | null;
   free_units_enabled?: boolean;
+  free_text_products?: string | null;
 };
 
 export type OfferProduct = {
@@ -180,6 +183,7 @@ export type OfferProduct = {
   free_units_percentage?: number | null;
   is_quota?: boolean;
   medications?: Medication;
+  expiry_date?: string | null;
 };
 
 export type OfferDocument = {
@@ -197,4 +201,21 @@ export type ActiveOffer = PromotionalOffer & {
     medication: Medication;
   })[];
   documents?: OfferDocument[];
+};
+
+export type Region = {
+  id: string;
+  name: string;
+  wilayas: string[];
+};
+
+export type WholesalerDeliveryDays = {
+  id: string;
+  wholesaler_id: string;
+  region_id: string;
+  delivery_days: string[];
+};
+
+export type RegionWithDeliveryDays = Region & {
+  delivery_days?: string[];
 };
