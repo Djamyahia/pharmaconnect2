@@ -279,26 +279,35 @@ export function Inventory() {
   }
 
   async function handleDeleteItem(id: string) {
-    if (!id || id.trim() === '') {
-      console.error('Invalid item ID for deletion');
+  // 1️⃣ Si c’est un élément “unmatched” (chargé en mémoire, pas en base) :
+    const isUnmatched = uploadedItems.some(i => i.id === id);
+    if (isUnmatched) {
+      // on le retire simplement des deux listes d’état
+      setUploadedItems(prev => prev.filter(i => i.id !== id));
+      setInventory(prev => prev.filter(i => i.id !== id));
+      return; // on sort, pas de requête Supabase
+    }
+  
+    // 2️⃣ Sinon, c’est un vrai enregistrement en base : on supprime dans Supabase
+    if (!confirm('Êtes-vous sûr·e de vouloir supprimer cet article définitivement ?')) {
       return;
     }
-
-    if (!confirm('Are you sure you want to delete this item?')) return;
-
     try {
       const { error } = await supabase
         .from('wholesaler_inventory')
         .delete()
         .eq('id', id);
-
+  
       if (error) throw error;
-
+  
+      // et on recharge l’inventaire
       fetchInventory();
     } catch (error) {
       console.error('Error deleting inventory item:', error);
+      alert('Échec de la suppression. Veuillez réessayer.');
     }
   }
+
 
   const normalize = (str: string) => {
     if (!str) return '';
@@ -354,8 +363,16 @@ export function Inventory() {
     const file = event.target.files?.[0];
     if (!file || !user?.id) return;
 
+    // 2.a) Demander le mode d'import
+    // 1) Demande à l’utilisateur
+    const shouldReplace = window.confirm(
+      'Voulez-vous **remplacer** tout l’inventaire existant ?\n' +
+      'OK = remplacer, Annuler = ajouter seulement les produits du fichier.'
+    );
+    
     setUploadLoading(true);
     setError('');
+
 
     try {
       const data = await file.arrayBuffer();
@@ -431,12 +448,15 @@ export function Inventory() {
         }
       }
 
-      const { error: deleteError } = await supabase
-        .from('wholesaler_inventory')
-        .delete()
-        .eq('wholesaler_id', user.id);
+    
+      if (shouldReplace) {
+        const { error: deleteError } = await supabase
+          .from('wholesaler_inventory')
+          .delete()
+          .eq('wholesaler_id', user.id);
+        if (deleteError) throw deleteError;
+      }
 
-      if (deleteError) throw deleteError;
 
       if (itemsToInsert.length > 0) {
         const { error: insertError } = await supabase
@@ -452,7 +472,11 @@ export function Inventory() {
         ...newInventory.filter(item => item.isUnmatched)
       ]);
 
-      alert('Inventaire mis à jour. Veuillez corriger les éléments non reconnus.');
+      if (shouldReplace) {
+        alert('✅ Inventaire entièrement remplacé avec succès. Veuillez corriger les éléments non reconnus');
+      } else {
+        alert('✅ Nouveaux produits ajoutés à l’inventaire existant. Veuillez corriger les éléments non reconnus');
+      }
     } catch (error: any) {
       console.error('Error uploading inventory:', error);
       setError(error.message || 'Failed to update inventory.');
@@ -600,9 +624,7 @@ export function Inventory() {
                 <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Prix
                 </th>
-                <th scope="col" className="hidden sm:table-cell px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Wilayas
-                </th>
+                
                 <th scope="col" className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
                 </th>
@@ -679,16 +701,7 @@ export function Inventory() {
                       <span className="text-sm text-gray-900">{item.price.toFixed(2)} DZD</span>
                     )}
                   </td>
-                  <td className="hidden sm:table-cell px-4 py-4">
-                    <div className="text-sm text-gray-900 max-h-20 overflow-y-auto">
-                      {item.delivery_wilayas.map((w, i) => (
-                        <span key={w} className="inline-block mr-1">
-                          {algerianWilayas.find(aw => aw.value === w)?.label}
-                          {i < item.delivery_wilayas.length - 1 ? ',' : ''}
-                        </span>
-                      ))}
-                    </div>
-                  </td>
+                  
                   <td className="px-4 py-4 text-center">
                     {editingItem?.id === item.id ? (
                       <div className="flex justify-center space-x-2">
