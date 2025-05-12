@@ -10,7 +10,9 @@ export function VerifyEmail() {
         <h2 className="text-2xl font-bold text-gray-900 mb-4">Merci de votre inscription !</h2>
         <p className="text-gray-600 mb-6">
           Un email de confirmation a été envoyé à votre adresse email.<br />
-          Veuillez vérifier votre boîte de réception et cliquer sur le lien pour activer votre compte.
+          <strong className="font-bold">
+          Veuillez vérifier votre boîte de réception, dans vos SPAMS,  et cliquer sur le lien pour activer votre compte.
+            </strong>
         </p>
         <p className="text-gray-500 mb-6">
           Une fois votre email confirmé, vous pourrez vous connecter à votre compte.

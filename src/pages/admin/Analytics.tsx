@@ -124,6 +124,14 @@ type AnalyticsData = {
 
 export function Analytics() {
   const [loading, setLoading] = useState(true);
+  // Remplacez par vos vrais IDs Supabase
+  const EXCLUDED_USER_IDS = [
+    'Pharmagros', 
+    'Pharmacie201',
+    'PharmaConnect',
+    'Axsana'
+  ];
+
   const [data, setData] = useState<AnalyticsData>({
     users: {
       total: 0,
@@ -326,20 +334,19 @@ export function Analytics() {
         return acc;
       }, {});
 
-      const activityStats = {
-        today: activities.filter(a => new Date(a.created_at) >= today).length,
-        week: activities.filter(a => new Date(a.created_at) >= weekAgo).length,
-        month: activities.filter(a => new Date(a.created_at) >= monthAgo).length,
-        details: {
-          recent: activities.slice(0, 10).map(a => ({
-            user_name: a.user?.company_name || 'Unknown',
-            action: a.action,
-            page: a.page,
-            created_at: a.created_at
-          })),
-          by_date: Object.values(activityByDate)
-        }
-      };
+      const uniqueUserCount = (arr: any[]) => new Set(arr.map(a => a.user_id)).size
+
+const activityStats = {
+  today: uniqueUserCount( activities.filter(a => new Date(a.created_at) >=   today) ),
+  week:  uniqueUserCount( activities.filter(a => new Date(a.created_at) >=  weekAgo) ),
+  month: uniqueUserCount( activities.filter(a => new Date(a.created_at) >= monthAgo) ),
+  details: {
+    recent:   activities
+                .slice(0, 10)
+                .map(a => ({ user_name: a.user?.company_name || '—', action: a.action, page: a.page, created_at: a.created_at })),
+    by_date:  Object.values(activityByDate)
+  }
+}
 
       setData({
         users: userStats,

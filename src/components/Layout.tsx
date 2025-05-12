@@ -3,13 +3,17 @@ import { Outlet, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Pill, LogOut, Menu, X, Tag } from 'lucide-react';
 import { NotificationBell } from './NotificationBell';
+import { ScrollToTop } from '../components/ScrollToTop';
+
 
 export function Layout() {
   const { user, signOut } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
+  const dashboardBase = user?.is_admin ? 'admin' : user?.role;
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <ScrollToTop />
       <nav className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
@@ -25,6 +29,30 @@ export function Layout() {
                 >
                   <Tag className="h-4 w-4 mr-1" />
                   Packs Publics
+                </Link>
+                <Link
+                  to="/fonctionnalites"
+                  className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-500 hover:text-indigo-600 hover:border-indigo-300"
+                >
+                  Fonctionnalités
+                </Link>
+                <Link
+                  to="/faq"
+                  className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-500 hover:text-indigo-600 hover:border-indigo-300"
+                >
+                  FAQ
+                </Link>
+                <Link
+                  to="/charte-conformite"
+                  className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-500 hover:text-indigo-600 hover:border-indigo-300"
+                >
+                  Charte de conformité
+                </Link>
+                <Link
+                  to="/cgu"
+                  className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-500 hover:text-indigo-600 hover:border-indigo-300"
+                >
+                  CGU
                 </Link>
               </div>
             </div>
@@ -50,7 +78,7 @@ export function Layout() {
                 <div className="flex items-center space-x-4">
                   <NotificationBell />
                   <Link
-                    to={`/${user.role}`}
+                    to={`/${dashboardBase}`}
                     className="text-gray-700 hover:text-indigo-600 transition-colors"
                   >
                     Tableau de bord
@@ -94,10 +122,42 @@ export function Layout() {
               Packs Publics
             </Link>
             
+            <Link
+              to="/fonctionnalites"
+              className="block px-4 py-2 text-base font-medium text-gray-700 hover:text-indigo-600 hover:bg-gray-50"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Fonctionnalités
+            </Link>
+            
+            <Link
+              to="/faq"
+              className="block px-4 py-2 text-base font-medium text-gray-700 hover:text-indigo-600 hover:bg-gray-50"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              FAQ
+            </Link>
+            
+            <Link
+              to="/charte-conformite"
+              className="block px-4 py-2 text-base font-medium text-gray-700 hover:text-indigo-600 hover:bg-gray-50"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Charte de conformité
+            </Link>
+            
+            <Link
+              to="/cgu"
+              className="block px-4 py-2 text-base font-medium text-gray-700 hover:text-indigo-600 hover:bg-gray-50"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              CGU
+            </Link>
+            
             {user ? (
               <>
                 <Link
-                  to={`/${user.role}`}
+                  to={`/${dashboardBase}`}
                   className="block px-4 py-2 text-base font-medium text-gray-700 hover:text-indigo-600 hover:bg-gray-50"
                   onClick={() => setMobileMenuOpen(false)}
                 >
@@ -141,6 +201,75 @@ export function Layout() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Outlet />
       </main>
+
+      <footer className="bg-white border-t border-gray-200 py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900 tracking-wider uppercase">À propos</h3>
+              <ul className="mt-4 space-y-4">
+                <li>
+                  <Link to="/fonctionnalites" className="text-base text-gray-500 hover:text-indigo-600">
+                    Fonctionnalités
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/faq" className="text-base text-gray-500 hover:text-indigo-600">
+                    FAQ
+                  </Link>
+                </li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900 tracking-wider uppercase">Légal</h3>
+              <ul className="mt-4 space-y-4">
+                <li>
+                  <Link to="/charte-conformite" className="text-base text-gray-500 hover:text-indigo-600">
+                    Charte de conformité
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/cgu" className="text-base text-gray-500 hover:text-indigo-600">
+                    CGU
+                  </Link>
+                </li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900 tracking-wider uppercase">Accès</h3>
+              <ul className="mt-4 space-y-4">
+                <li>
+                  <Link to="/login" className="text-base text-gray-500 hover:text-indigo-600">
+                    Se connecter
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/register" className="text-base text-gray-500 hover:text-indigo-600">
+                    S'inscrire
+                  </Link>
+                </li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900 tracking-wider uppercase">Contact</h3>
+              <ul className="mt-4 space-y-4">
+                <li>
+                  <a href="mailto:pharmaconnect.plateforme@gmail.com" className="text-base text-gray-500 hover:text-indigo-600">
+                    pharmaconnect.plateforme@gmail.com
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+          <div className="mt-8 border-t border-gray-200 pt-8 md:flex md:items-center md:justify-between">
+            <div className="flex space-x-6 md:order-2">
+              <span className="text-sm text-gray-500">
+                &copy; {new Date().getFullYear()} PharmaConnect. Tous droits réservés.
+              </span>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
