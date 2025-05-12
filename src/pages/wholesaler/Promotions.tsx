@@ -208,8 +208,8 @@ export function Promotions() {
       return;
     }
 
-    if (editingPromotion.free_units_percentage <= 0 || editingPromotion.free_units_percentage > 100) {
-      setError('Le pourcentage d\'unités gratuites doit être entre 0 et 100');
+    if (editingPromotion.free_units_percentage <= 0 ) {
+      setError('Le pourcentage d\'unités gratuites doit être superieur à 0 et 100');
       return;
     }
 
@@ -315,8 +315,8 @@ try {
       return;
     }
 
-    if (newPromotion.free_units_percentage <= 0 || newPromotion.free_units_percentage > 100) {
-      setError('Le pourcentage d\'unités gratuites doit être entre 0 et 100');
+    if (newPromotion.free_units_percentage <= 0 ) {
+      setError('Le pourcentage d\'unités gratuites doit être superieur à 0');
       return;
     }
 
@@ -486,8 +486,7 @@ try {
                         {editingPromotion?.id === promotion.id ? (
                           <input
                             type="number"
-                            min="0.01"
-                            max="100"
+                            min="0.01"                            
                             step="0.01"
                             value={editingPromotion.free_units_percentage}
                             onChange={(e) => setEditingPromotion({
@@ -685,8 +684,7 @@ try {
                 </label>
                 <input
                   type="number"
-                  min="0.01"
-                  max="100"
+                  min="0.01"                  
                   step="0.01"
                   value={newPromotion.free_units_percentage}
                   onChange={(e) => {
