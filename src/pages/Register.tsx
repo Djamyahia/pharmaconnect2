@@ -29,6 +29,7 @@ export function Register() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [registeredEmail, setRegisteredEmail] = useState('');
+  const [acceptedCGU, setAcceptedCGU] = useState(false);
   const [formData, setFormData] = useState<RegisterData>({
     email: '',
     password: '',
@@ -70,6 +71,11 @@ export function Register() {
     e.preventDefault();
     setError('');
 
+    if (!acceptedCGU) {
+      setError('Vous devez accepter les CGU pour continuer.');
+      return;
+    }
+
     try {
       setLoading(true);
       const validatedData = registerSchema.parse(formData);
@@ -84,6 +90,8 @@ export function Register() {
       } else {
         setError('Une erreur est survenue lors de la création du compte.');
       }
+      
+
     } finally {
       setLoading(false);
     }
@@ -248,6 +256,22 @@ export function Register() {
             onChange={handleChange}
             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
           />
+        </div>
+
+        <div className="flex items-start space-x-2">
+          <input
+            id="acceptCGU"
+            type="checkbox"
+            checked={acceptedCGU}
+            onChange={() => setAcceptedCGU(prev => !prev)}
+            className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+          />
+          <label htmlFor="acceptCGU" className="text-sm text-gray-600">
+            En créant un compte, j'accepte les{' '}
+            <Link to="/cgu" className="text-indigo-600 hover:text-indigo-500 underline">
+              Conditions Générales d'Utilisation
+            </Link>.
+          </label>
         </div>
 
         <button

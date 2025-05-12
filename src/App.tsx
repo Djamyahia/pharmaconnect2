@@ -13,6 +13,10 @@ import { Home } from './pages/Home';
 import { PublicOffers } from './pages/PublicOffers';
 import { OfferDetails } from './pages/OfferDetails';
 import { useAuth } from './contexts/AuthContext';
+import { Fonctionnalites } from './pages/Fonctionnalites';
+import { FAQ } from './pages/FAQ';
+import { CharteConformite } from './pages/CharteConformite';
+import { CGU } from './pages/CGU';
 
 function DashboardRedirect() {
   const { user, loading } = useAuth();
@@ -49,6 +53,10 @@ function App() {
             <Route path="update-password" element={<UpdatePassword />} />
             <Route path="offers" element={<PublicOffers />} />
             <Route path="offers/:id" element={<OfferDetails />} />
+            <Route path="fonctionnalites" element={<Fonctionnalites />} />
+            <Route path="faq" element={<FAQ />} />
+            <Route path="charte-conformite" element={<CharteConformite />} />
+            <Route path="cgu" element={<CGU />} />
             <Route path="pharmacist/*" element={<PharmacistDashboard />} />
             <Route path="wholesaler/*" element={<WholesalerDashboard />} />
             <Route path="admin/*" element={<AdminDashboard />} />
