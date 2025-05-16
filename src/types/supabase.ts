@@ -219,3 +219,54 @@ export type WholesalerDeliveryDays = {
 export type RegionWithDeliveryDays = Region & {
   delivery_days?: string[];
 };
+
+// Tender System Types
+export type Tender = {
+  id: string;
+  pharmacist_id: string;
+  title: string;
+  deadline: string;
+  status: 'open' | 'closed' | 'canceled';
+  wilaya: string;
+  public_link: string;
+  is_public: boolean;
+  created_at: string;
+  updated_at: string;
+  admin_facebook_link?: string | null;
+  admin_facebook_profile?: string | null;
+};
+
+export type TenderItem = {
+  id: string;
+  tender_id: string;
+  medication_id: string;
+  quantity: number;
+  created_at: string;
+};
+
+export type TenderResponse = {
+  id: string;
+  tender_id: string;
+  wholesaler_id: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TenderResponseItem = {
+  id: string;
+  tender_response_id: string;
+  tender_item_id: string;
+  price: number;
+  free_units_percentage?: number | null;
+  delivery_date: string;
+  expiry_date?: string | null;
+  created_at: string;
+};
+
+export type TenderMessage = {
+  id: string;
+  tender_id: string;
+  user_id: string;
+  message: string;
+  created_at: string;
+};

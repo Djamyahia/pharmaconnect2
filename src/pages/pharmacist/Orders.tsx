@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ShoppingCart, Clock, CheckCircle, XCircle, ChevronDown, ChevronUp, Loader2, AlertTriangle, Calendar } from 'lucide-react';
+import { ShoppingCart, Clock, CheckCircle, XCircle, ChevronDown, ChevronUp, Loader2, AlertTriangle, Calendar, FileText } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import type { Order, OrderItem } from '../../types/supabase';
 import { UserLink } from '../../components/UserLink';
@@ -27,6 +27,10 @@ type ExtendedOrder = Order & {
     offer_type: 'pack' | 'threshold';
     min_purchase_amount?: number;
     free_text_products?: string;
+  };
+  tender_details?: {
+    tender_id: string;
+    tender_title?: string;
   };
 };
 
@@ -76,16 +80,20 @@ export function Orders() {
 
       if (error) throw error;
       
-      // Process orders to identify pack/threshold offers
+      // Process orders to identify pack/threshold offers and tenders
       const processedOrders = (data || []).map(order => {
         // Check if this is a pack order by looking at metadata or patterns
-        const isPackOrder = order.order_items.length > 1;
+        const isPackOrder = order.metadata && order.metadata.offer_type === 'pack';
         
-        // For threshold orders, check if there's a minimum purchase amount
-        const isThresholdOrder = order.metadata && order.metadata.min_purchase_amount;
+        // For threshold offers, check if there's a minimum purchase amount
+        const isThresholdOrder = order.metadata && order.metadata.offer_type === 'threshold';
+        
+        // Check if this is a tender order
+        const isTenderOrder = order.metadata && order.metadata.source === 'tender';
         
         // Extract offer details if available
         let offerDetails = undefined;
+        let tenderDetails = undefined;
         
         if (isPackOrder || isThresholdOrder) {
           offerDetails = {
@@ -96,9 +104,17 @@ export function Orders() {
           };
         }
         
+        if (isTenderOrder) {
+          tenderDetails = {
+            tender_id: order.metadata?.tender_id,
+            tender_title: order.metadata?.tender_title || "Appel d'offres"
+          };
+        }
+        
         return {
           ...order,
-          offer_details: offerDetails
+          offer_details: offerDetails,
+          tender_details: tenderDetails
         };
       });
       
@@ -263,6 +279,12 @@ export function Orders() {
                             {order.offer_details.offer_name} - {order.offer_details.offer_type === 'pack' ? 'Pack groupé' : 'Achats libres'}
                           </p>
                         )}
+                        {order.tender_details && (
+                          <p className="text-sm text-indigo-600 flex items-center">
+                            <FileText className="h-4 w-4 mr-1" />
+                            Appel d'offres
+                          </p>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center space-x-4">
@@ -316,6 +338,19 @@ export function Orders() {
                             </p>
                           </div>
                         )}
+                      </div>
+                    )}
+
+                    {/* Special display for tender orders */}
+                    {order.tender_details && (
+                      <div className="bg-indigo-50 p-4 rounded-lg mb-4">
+                        <h4 className="text-sm font-medium text-indigo-800 mb-2">
+                          <FileText className="h-4 w-4 inline mr-1" />
+                          Commande issue d'un appel d'offres
+                        </h4>
+                        <p className="text-sm text-indigo-700">
+                          Cette commande a été créée à partir d'une réponse à votre appel d'offres.
+                        </p>
                       </div>
                     )}
 

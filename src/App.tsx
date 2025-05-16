@@ -12,6 +12,8 @@ import AdminDashboard from './pages/admin/Dashboard';
 import { Home } from './pages/Home';
 import { PublicOffers } from './pages/PublicOffers';
 import { OfferDetails } from './pages/OfferDetails';
+import { PublicTenders } from './pages/PublicTenders';
+import { PublicTenderView } from './pages/PublicTenderView';
 import { useAuth } from './contexts/AuthContext';
 import { Fonctionnalites } from './pages/Fonctionnalites';
 import { FAQ } from './pages/FAQ';
@@ -53,6 +55,8 @@ function App() {
             <Route path="update-password" element={<UpdatePassword />} />
             <Route path="offers" element={<PublicOffers />} />
             <Route path="offers/:id" element={<OfferDetails />} />
+            <Route path="tenders" element={<PublicTenders />} />
+            <Route path="tenders/public/:publicLink" element={<PublicTenderView />} />
             <Route path="fonctionnalites" element={<Fonctionnalites />} />
             <Route path="faq" element={<FAQ />} />
             <Route path="charte-conformite" element={<CharteConformite />} />

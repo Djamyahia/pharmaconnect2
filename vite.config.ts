@@ -12,6 +12,16 @@ export default defineConfig({
     fs: {
       strict: true,
     },
+    // Ensure correct MIME types for all JavaScript files
+    middlewares: [
+      (req, res, next) => {
+        // Handle both .js and .jsx files
+        if (req.url?.endsWith('.js') || req.url?.endsWith('.jsx')) {
+          res.setHeader('Content-Type', 'application/javascript');
+        }
+        next();
+      },
+    ],
   },
   preview: {
     port: 5173,

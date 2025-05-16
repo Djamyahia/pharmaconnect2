@@ -1,6 +1,6 @@
 import React from "react";
 import { Routes, Route, Link, useLocation } from "react-router-dom";
-import { Package, ShoppingCart, Percent, User, TrendingUp, Sparkles, Clock, Tag, Pill } from "lucide-react";
+import { Package, ShoppingCart, Percent, User, TrendingUp, Sparkles, Clock, Tag, Pill, FileText } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { Inventory } from "./Inventory";
 import { Orders } from "./Orders";
@@ -10,6 +10,8 @@ import { Profile } from "../shared/Profile";
 import { Parapharmacy } from "./Parapharmacy";
 import { DailyActions } from "./DailyActions";
 import { PackManagement } from "./PackManagement";
+import { Tenders } from "./Tenders";
+import { TenderDetail } from "./TenderDetail";
 
 const WholesalerDashboard: React.FC = () => {
   const location = useLocation();
@@ -22,6 +24,7 @@ const WholesalerDashboard: React.FC = () => {
     
     { name: 'Ventes Flash UG', href: '/wholesaler/promotions', icon: Percent },
     { name: 'Packs', href: '/wholesaler/packs', icon: Package },
+    { name: 'Appels d\'offres', href: '/wholesaler/tenders', icon: FileText },
     { name: 'Commandes', href: '/wholesaler/orders', icon: ShoppingCart },
     { name: 'Analytiques', href: '/wholesaler/analytics', icon: TrendingUp },
     { name: 'Profil', href: '/wholesaler/profile', icon: User },
@@ -127,6 +130,8 @@ const WholesalerDashboard: React.FC = () => {
                 <Route path="orders" element={<Orders />} />
                 <Route path="promotions" element={<Promotions />} />
                 <Route path="packs" element={<PackManagement />} />
+                <Route path="tenders" element={<Tenders />} />
+                <Route path="tenders/:id" element={<TenderDetail />} />
                 <Route path="analytics" element={<Analytics />} />
                 <Route path="profile" element={<Profile />} />
               </Routes>

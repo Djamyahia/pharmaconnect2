@@ -25,6 +25,7 @@ import {
   HelpCircle,
   FileCheck
 } from 'lucide-react';
+import { Navigate } from 'react-router-dom';
 
 const FadeInWhenVisible = ({ children }: { children: React.ReactNode }) => {
   const [ref, inView] = useInView({
@@ -59,17 +60,8 @@ export function Home() {
   const dashboardBase = user?.is_admin ? 'admin' : user?.role;
 
   if (user) {
-    return (
-      <div className="text-center">
-        <h1 className="text-4xl font-bold text-gray-900 mb-8">Bienvenue sur PharmaConnect</h1>
-        <Link
-          to={`/${dashboardBase}`}
-          className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
-        >
-          Accéder au tableau de bord
-        </Link>
-      </div>
-    );
+    // Redirige automatiquement vers le dashboard
+    return <Navigate to={`/${dashboardBase}`} replace />;
   }
 
   return (
