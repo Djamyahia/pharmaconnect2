@@ -1,6 +1,6 @@
 import React from "react";
 import { Routes, Route, Link, useLocation } from "react-router-dom";
-import { Package, ShoppingCart, Percent, User, TrendingUp, Sparkles, Tag, Pill } from "lucide-react";
+import { Package, ShoppingCart, Percent, User, TrendingUp, Sparkles, Tag, Pill, FileText } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { Products } from "./Products";
 import { Orders } from "./Orders";
@@ -9,6 +9,9 @@ import { Analytics } from "./Analytics";
 import { Profile } from "../shared/Profile";
 import { Parapharmacy } from "./Parapharmacy";
 import { SpecialOffers } from "./SpecialOffers";
+import { Tenders } from "./Tenders";
+import { TenderDetail } from "./TenderDetail";
+import { CreateTender } from "./CreateTender";
 
 const PharmacistDashboard: React.FC = () => {
   const location = useLocation();
@@ -19,6 +22,7 @@ const PharmacistDashboard: React.FC = () => {
     { name: 'Parapharmacie', href: '/pharmacist/parapharmacy', icon: Sparkles },    
     { name: 'Ventes Flash UG', href: '/pharmacist/promotions', icon: Percent },
     { name: 'Packs', href: '/pharmacist/offers', icon: Package },
+    { name: 'Appels d\'offres', href: '/pharmacist/tenders', icon: FileText },
     { name: 'Commandes', href: '/pharmacist/orders', icon: ShoppingCart },
     { name: 'Analytiques', href: '/pharmacist/analytics', icon: TrendingUp },
     { name: 'Profil', href: '/pharmacist/profile', icon: User },
@@ -93,7 +97,7 @@ const PharmacistDashboard: React.FC = () => {
 
       {/* Mobile navigation */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t z-10">
-        <div className="grid grid-cols-7 gap-1">
+        <div className="grid grid-cols-8 gap-1">
           {navigation.map((item) => {
             const isActive = location.pathname === item.href;
             return (
@@ -124,6 +128,9 @@ const PharmacistDashboard: React.FC = () => {
                 <Route path="promotions" element={<Promotions />} />
                 <Route path="offers" element={<SpecialOffers />} />
                 <Route path="offers/:id" element={<SpecialOffers />} />
+                <Route path="tenders" element={<Tenders />} />
+                <Route path="tenders/create" element={<CreateTender />} />
+                <Route path="tenders/:id" element={<TenderDetail />} />
                 <Route path="analytics" element={<Analytics />} />
                 <Route path="profile" element={<Profile />} />
               </Routes>

@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+    <title>Commande acceptée</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        color: #333;
+        margin: 0;
+        padding: 0;
+        background: #f3f4f6;
+      }
+      .container {
+        max-width: 600px;
+        margin: 0 auto;
+        background: white;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      }
+      .header {
+        background-color: #4F46E5;
+        color: white;
+        text-align: center;
+        padding: 16px;
+      }
+      .header h1 {
+        margin: 0;
+        font-size: 20px;
+      }
+      .content {
+        padding: 16px;
+      }
+      h2 {
+        font-size: 16px;
+        color: #4F46E5;
+        margin: 16px 0 8px;
+      }
+      p {
+        margin: 8px 0;
+        font-size: 14px;
+        line-height: 1.4;
+      }
+      .card {
+        background: #f9fafb;
+        padding: 16px;
+        border-radius: 6px;
+        border: 1px solid #e5e7eb;
+        margin: 16px 0;
+      }
+      .button-container {
+        text-align: center;
+        margin: 24px 0 0;
+      }
+      .button {
+        display: inline-block;
+        background-color: #4F46E5;
+        color: white;
+        padding: 10px 20px;
+        text-decoration: none;
+        border-radius: 4px;
+        font-weight: bold;
+        font-size: 14px;
+      }
+      .footer {
+        font-size: 12px;
+        color: #777;
+        text-align: center;
+        padding: 16px;
+        border-top: 1px solid #eee;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>Commande acceptée</h1>
+      </div>
+      <div class="content">
+        <p>Bonjour {{wholesaler_name}},</p>
+        <p>Le pharmacien a accepté votre proposition dans le cadre de l'appel d'offres et a passé commande.</p>
+
+        <div class="card">
+          <h2>Détails de la commande</h2>
+          <p><strong>Numéro :</strong> {{order_id}}</p>
+          <p><strong>Appel d'offres :</strong> {{tender_title}}</p>
+          <p><strong>Date de livraison :</strong> {{delivery_date}}</p>
+          <p><strong>Montant total :</strong> {{total_amount}} DZD</p>
+        </div>
+
+        <div class="card">
+          <h2>Votre réponse</h2>
+          <p>{{wholesaler_response}}</p>
+        </div>
+
+        <div class="card">
+          <h2>Coordonnées du pharmacien</h2>
+          <p><strong>Nom :</strong> {{pharmacist_name}}</p>
+          <p><strong>Email :</strong> {{pharmacist_email}}</p>
+          <p><strong>Téléphone :</strong> {{pharmacist_phone}}</p>
+          <p><strong>Adresse :</strong> {{pharmacist_address}}, {{pharmacist_wilaya}}</p>
+        </div>
+
+        <p>Vous pouvez maintenant contacter le pharmacien pour organiser la livraison1111111111111111111111111111111111111.</p>
+
+        <div class="button-container">
+          <a href="{{tender_link}}" class="button">Voir l'appel d'offres</a>
+        </div>
+
+        <p>Cordialement,<br/>L’équipe PharmaConnect</p>
+      </div>
+      <div class="footer">
+        Cet email a été envoyé automatiquement par PharmaConnect.<br/>© 2025 PharmaConnect. Tous droits réservés.
+      </div>
+    </div>
+  </body>
+</html>

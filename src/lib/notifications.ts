@@ -1,9 +1,10 @@
-import { supabase } from './supabase';
+// src/lib/notifications.ts
+import { supabase } from './supabase'
 
 type EmailTemplate = {
-  subject: string;
-  content: string;
-};
+  subject: string
+  content: string
+}
 
 async function getEmailTemplate(type: string): Promise<EmailTemplate | null> {
   try {
@@ -11,48 +12,43 @@ async function getEmailTemplate(type: string): Promise<EmailTemplate | null> {
       .from('email_templates')
       .select('subject, content')
       .eq('type', type)
-      .maybeSingle();
+      .maybeSingle()
     if (error) {
-      console.error('Error fetching email template:', error);
-      return null;
+      console.error('Error fetching email template:', error)
+      return null
     }
-    return data;
+    return data
   } catch (err) {
-    console.error('Error in getEmailTemplate:', err);
-    return null;
+    console.error('Error in getEmailTemplate:', err)
+    return null
   }
 }
 
 function replacePlaceholders(text: string, replacements: Record<string, string>): string {
-  // Handle conditional blocks first
+  // Blocs conditionnels {{#if key}}…{{/if}}
   text = text.replace(/{{#if ([^}]+)}}([\s\S]*?){{\/if}}/g, (_, key, content) =>
     replacements[key] ? content : ''
-  );
-  // Then replace regular placeholders
-  return text.replace(/{{(\w+)}}/g, (_, key) => replacements[key] || '');
+  )
+  // Remplacements simples {{key}}
+  return text.replace(/{{(\w+)}}/g, (_, key) => replacements[key] || '')
 }
 
 async function sendEmail(to: string, subject: string, content: string) {
-  try {
-    const functionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-email-fixed`;
-    const res = await fetch(functionUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-      },
-      body: JSON.stringify({ to, subject, content }),
-    });
-    if (!res.ok) {
-      const result = await res.json();
-      console.error('Error response from send-email:', result);
-      throw new Error(`Failed to send email: ${result.message || res.statusText}`);
-    }
-    return await res.json();
-  } catch (err) {
-    console.error('Error sending email:', err);
-    throw err;
+  const functionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-email-fixed`
+  const res = await fetch(functionUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+    },
+    body: JSON.stringify({ to, subject, content }),
+  })
+  if (!res.ok) {
+    const result = await res.json()
+    console.error('Error response from send-email:', result)
+    throw new Error(`Failed to send email: ${result.message || res.statusText}`)
   }
+  return res.json()
 }
 
 export async function sendOrderNotification(
@@ -61,107 +57,153 @@ export async function sendOrderNotification(
   replacements: Record<string, string>
 ) {
   try {
-    const orderTypes = ['order_accepted', 'order_placed', 'order_canceled'];
-    if (orderTypes.includes(type)) {
-      const orderId = replacements.order_id;
-      // Fetch order metadata to detect pack
-      const { data: orderMeta, error: metaErr } = await supabase
-        .from('orders')
-        .select('metadata')
-        .eq('id', orderId)
-        .single();
-      if (metaErr) console.error('Error fetching order metadata:', metaErr);
-
-      const offerId = orderMeta?.metadata?.offer_id;
-      let productsList = '';
-
-      if (offerId) {
-        // Pack: fetch offer_products to get %UG
-        const { data: offerProducts, error: opErr } = await supabase
-          .from('offer_products')
-          .select('quantity, price, free_units_percentage, medications(commercial_name, form, dosage)')
-          .eq('offer_id', offerId);
-        if (opErr) console.error('Error fetching offer_products:', opErr);
-        else if (offerProducts) {
-          productsList = offerProducts
-            .map(op => {
-              const { commercial_name, form, dosage } = op.medications;
-              const label = `${commercial_name}${form ? ` – ${form}` : ''}${dosage ? ` ${dosage}` : ''}`;
-              const paidQty = op.quantity;
-              const unitPrice = op.price;
-              const total = (paidQty * unitPrice).toFixed(2);
-              const ugPct = op.free_units_percentage || 0;
-              let line = `- ${label} : ${paidQty} unité(s) payante(s)`;
-              if (ugPct > 0) {
-                line += `, +${ugPct}% UG`;
-              }
-              line += ` à ${unitPrice.toFixed(2)} DZD chacune (Total payé = ${total} DZD)`;
-              return line;
-            })
-            .join('\n');
-        }
-      } else {
-        // Normal: fetch order_items
-        const { data: orderItems, error: itemsErr } = await supabase
-          .from('order_items')
-          .select('quantity, unit_price, is_parapharmacy, medications(commercial_name, form, dosage), parapharmacy_products(name)')
-          .eq('order_id', orderId);
-        if (itemsErr) console.error('Error fetching order_items:', itemsErr);
-        else if (orderItems) {
-          productsList = orderItems
-            .map(item => {
-              const name = item.is_parapharmacy ? item.parapharmacy_products!.name : item.medications!.commercial_name;
-              const form = item.medications?.form || '';
-              const dosage = item.medications?.dosage || '';
-              const qty = item.quantity;
-              const price = item.unit_price;
-              const total = (qty * price).toFixed(2);
-              return `- ${name}${form ? ` – ${form}` : ''}${dosage ? ` ${dosage}` : ''}` +
-                     ` : ${qty} unité(s) à ${price.toFixed(2)} DZD chacune (Total = ${total} DZD)`;
-            })
-            .join('\n');
-        }
+    // --- 1) Notification "Commande acceptée – Appel d'offres" ---
+    if (type === 'tender_order_accepted') {
+      const tenderId = replacements.tender_id
+      const { data: tender, error: tenderErr } = await supabase
+        .from('tenders')
+        .select(`
+          *,
+          items:tender_items (
+            *,
+            medication:medications (commercial_name, form, dosage)
+          ),
+          responses:tender_responses (
+            *,
+            wholesaler:users (company_name, email, phone),
+            items:tender_response_items (
+              *,
+              tender_item:tender_items (
+                *,
+                medication:medications (commercial_name, form, dosage)
+              )
+            )
+          )
+        `)
+        .eq('id', tenderId)
+        .single()
+      if (tenderErr || !tender) {
+        console.error('Error fetching tender:', tenderErr)
+        throw new Error('Impossible de récupérer l’appel d’offres pour l’email')
       }
-      replacements.products_list = productsList;
+
+      // On ne garde que la réponse du destinataire
+      const response = tender.responses.find(r => r.wholesaler.email === recipientEmail)
+
+      let responsesHtml: string
+      if (response) {
+        const total = response.items
+          .reduce((sum, ri) => sum + ri.price * (ri.tender_item?.quantity || 0), 0)
+          .toFixed(2)
+        const itemsHtml = response.items
+          .map(ri => {
+            const ti = ri.tender_item!
+            const lineTotal = (ri.price * (ti.quantity || 0)).toFixed(2)
+            return `
+              <li style="margin:4px 0;font-size:14px;line-height:1.4;">
+                <strong>${ti.medication.commercial_name}</strong>
+                ${ti.medication.form ? `– ${ti.medication.form}` : ''}
+                ${ti.medication.dosage ? ti.medication.dosage : ''},
+                Qté: ${ti.quantity}, PU: ${ri.price.toFixed(2)} DZD,
+                UG: ${ri.free_units_percentage ?? '-'}%, Total: ${lineTotal} DZD,
+                Livraison: ${new Date(ri.delivery_date).toLocaleDateString('fr-FR')}
+              </li>`
+          })
+          .join('')
+        responsesHtml = `
+          <div style="background:#f9fafb;padding:12px 16px;border-radius:6px;border:1px solid #e5e7eb;margin:16px 0;">
+            <h2 style="font-size:16px;color:#4F46E5;margin:0 0 8px;line-height:1.3;">Votre réponse</h2>
+            <ul style="padding-left:20px;margin:0;">${itemsHtml}</ul>
+            <p style="margin:12px 0 4px;font-size:14px;line-height:1.5;"><strong>Total :</strong> ${total} DZD</p>
+          </div>`
+      } else {
+        responsesHtml = `<p style="margin:12px 0 4px;font-size:14px;line-height:1.5;">Aucune réponse trouvée pour vous.</p>`
+      }
+
+      // Construire l’URL du tableau de bord grossiste
+      const baseUrl = import.meta.env.VITE_SUPABASE_URL.replace(/\/$/, '')
+
+      // Template inline avec styles
+      const rawHtml = `
+<!DOCTYPE html>
+<html lang="fr"><body style="margin:0;padding:0;background:#f3f4f6;font-family:Arial,sans-serif;color:#333;">
+  <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.05);">
+    <div style="background:#4F46E5;padding:16px;text-align:center;">
+      <h1 style="margin:0;color:#fff;font-size:20px;line-height:1.2;">Commande acceptée</h1>
+    </div>
+    <div style="padding:16px;">
+      <p style="margin:12px 0 4px;font-size:14px;line-height:1.5;">Bonjour {{wholesaler_name}},</p>
+      <p style="margin:12px 0 4px;font-size:14px;line-height:1.5;">
+        Le pharmacien a accepté votre proposition et a passé commande.
+      </p>
+
+      <div style="background:#f9fafb;padding:12px 16px;border-radius:6px;border:1px solid #e5e7eb;margin:16px 0;">
+        <h2 style="font-size:16px;color:#4F46E5;margin:0 0 8px;line-height:1.3;">Détails de la commande</h2>
+        <p style="margin:6px 0;font-size:14px;line-height:1.5;"><strong>Numéro :</strong> {{order_id}}</p>
+        <p style="margin:6px 0;font-size:14px;line-height:1.5;"><strong>Appel d'offres :</strong> {{tender_title}}</p>
+        <p style="margin:6px 0;font-size:14px;line-height:1.5;"><strong>Date de livraison :</strong> {{delivery_date}}</p>
+        <p style="margin:6px 0;font-size:14px;line-height:1.5;"><strong>Montant total :</strong> {{total_amount}} DZD</p>
+      </div>
+
+      
+      ${responsesHtml}
+      <div style="background:#eef6ff;padding:12px 16px;border-radius:6px;border:1px solid #cddffc;margin:16px 0;">
+        <h2 style="font-size:16px;color:#2563eb;margin:0 0 8px;line-height:1.3;">
+          Coordonnées du pharmacien
+        </h2>
+        <p style="margin:4px 0;font-size:14px;line-height:1.5;">
+          <strong>Nom :</strong> {{pharmacist_name}}
+        </p>
+        <p style="margin:4px 0;font-size:14px;line-height:1.5;">
+          <strong>Email :</strong> <a href="mailto:{{pharmacist_email}}">{{pharmacist_email}}</a>
+        </p>
+        <p style="margin:4px 0;font-size:14px;line-height:1.5;">
+          <strong>Téléphone :</strong> {{pharmacist_phone}}
+        </p>
+        <p style="margin:4px 0;font-size:14px;line-height:1.5;">
+          <strong>Adresse :</strong> {{pharmacist_address}}, {{pharmacist_wilaya}}
+        </p>
+        <p style="margin:12px 0 0;font-size:14px;line-height:1.5;">
+          Merci de prendre directement contact avec le pharmacien pour finaliser votre commande.
+        </p>
+      </div>
+
+
+      
+
+      
+
+
+      <p style="margin:12px 0 4px;font-size:14px;line-height:1.5;">Cordialement,<br/>L’équipe PharmaConnect</p>
+    </div>
+    <div style="font-size:12px;color:#777;text-align:center;padding:16px;border-top:1px solid #eee;">
+      Cet email a été envoyé automatiquement par PharmaConnect.<br/>
+      © ${new Date().getFullYear()} PharmaConnect. Tous droits réservés.
+    </div>
+  </div>
+</body></html>
+      `
+
+      // On remplace enfin les {{…}} par leurs valeurs
+      const html = replacePlaceholders(rawHtml, replacements)
+
+      await sendEmail(
+        recipientEmail,
+        `Commande acceptée – Appel d'offres : ${replacements.tender_title}`,
+        html
+      )
+      return
     }
 
-    // Pack inline template override
-    if (replacements.offer_name) {
-      const tpl = `Bonjour {{wholesaler_name}},
-
-Une nouvelle commande de pack a été passée par {{pharmacist_name}}.
-
-Détails de la commande :
-- Numéro de commande : {{order_id}}
-- Nom du pack          : {{offer_name}}
-- Type de pack         : {{offer_type}}
-{{#if min_purchase_amount}}- Montant minimum d'achat : {{min_purchase_amount}} DZD{{/if}}
-- Montant total        : {{total_amount}}
-
-Liste des produits (UG indiquées par produit) :
-{{products_list}}
-
-Vous pouvez consulter cette commande dans votre espace grossiste :
-{{dashboard_url}}
-
-Cordialement,
-L'équipe PharmaConnect`;
-      const subject = replacePlaceholders('Nouvelle commande de pack reçue', replacements);
-      let content = replacePlaceholders(tpl, replacements);
-      content = content.replace('{{dashboard_url}}', `${window.location.origin}/wholesaler/orders`);
-      await sendEmail(recipientEmail, subject, content);
-      return;
-    }
-
-    // Standard templates
-    const template = await getEmailTemplate(type);
-    if (!template) throw new Error(`Template not found: ${type}`);
-    let content = replacePlaceholders(template.content, replacements);
-    const subject = replacePlaceholders(template.subject, replacements);
-    if (type === 'order_placed') content = `Vous pouvez consulter votre commande : ${window.location.origin}/wholesaler/orders\n\n` + content;
-    else if (type === 'order_accepted') content = `Vous pouvez consulter votre commande : ${window.location.origin}/pharmacist/orders\n\n` + content;
-    await sendEmail(recipientEmail, subject, content);
+    //
+    // 2) Les autres notifications (order_placed, order_accepted classique, pack…)
+    //
+    const template = await getEmailTemplate(type)
+    if (!template) throw new Error(`Template not found: ${type}`)
+    const body = replacePlaceholders(template.content, replacements)
+    const subject = replacePlaceholders(template.subject, replacements)
+    await sendEmail(recipientEmail, subject, body)
   } catch (err) {
-    console.error('Error in sendOrderNotification:', err);
+    console.error('Error in sendOrderNotification:', err)
   }
 }

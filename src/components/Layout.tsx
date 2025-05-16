@@ -1,7 +1,7 @@
 import React from 'react';
 import { Outlet, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Pill, LogOut, Menu, X, Tag } from 'lucide-react';
+import { Pill, LogOut, Menu, X, Tag, FileText } from 'lucide-react';
 import { NotificationBell } from './NotificationBell';
 import { ScrollToTop } from '../components/ScrollToTop';
 
@@ -31,29 +31,13 @@ export function Layout() {
                   Packs Publics
                 </Link>
                 <Link
-                  to="/fonctionnalites"
+                  to="/tenders"
                   className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-500 hover:text-indigo-600 hover:border-indigo-300"
                 >
-                  Fonctionnalités
+                  <FileText className="h-4 w-4 mr-1" />
+                  Demandes Pharmaciens
                 </Link>
-                <Link
-                  to="/faq"
-                  className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-500 hover:text-indigo-600 hover:border-indigo-300"
-                >
-                  FAQ
-                </Link>
-                <Link
-                  to="/charte-conformite"
-                  className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-500 hover:text-indigo-600 hover:border-indigo-300"
-                >
-                  Charte de conformité
-                </Link>
-                <Link
-                  to="/cgu"
-                  className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-500 hover:text-indigo-600 hover:border-indigo-300"
-                >
-                  CGU
-                </Link>
+                
               </div>
             </div>
 
@@ -120,6 +104,14 @@ export function Layout() {
               onClick={() => setMobileMenuOpen(false)}
             >
               Packs Publics
+            </Link>
+            
+            <Link
+              to="/tenders"
+              className="block px-4 py-2 text-base font-medium text-gray-700 hover:text-indigo-600 hover:bg-gray-50"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Appels d'offres
             </Link>
             
             <Link
@@ -198,7 +190,7 @@ export function Layout() {
         </div>
       </nav>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Outlet />
       </main>
 

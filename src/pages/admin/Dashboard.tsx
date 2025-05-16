@@ -1,6 +1,6 @@
 import React from "react";
 import { Routes, Route, Link, useLocation } from "react-router-dom";
-import { Users, Settings, Activity, CreditCard, BarChart2, User } from "lucide-react";
+import { Users, Settings, Activity, CreditCard, BarChart2, User, FileText, Package } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { UserManagement } from "./UserManagement";
 import { SubscriptionManagement } from "./SubscriptionManagement";
@@ -8,6 +8,12 @@ import { ActivityMonitoring } from "./ActivityMonitoring";
 import { Analytics } from "./Analytics";
 import { AppSettings } from "./AppSettings";
 import { Profile } from "../shared/Profile";
+import { TenderManagement } from "./TenderManagement";
+import { CreateTender } from './CreateTender';
+import { TenderDetail } from './TenderDetail';
+import { PackManagement } from './PackManagement';
+
+
 
 const AdminDashboard: React.FC = () => {
   const location = useLocation();
@@ -29,6 +35,8 @@ const AdminDashboard: React.FC = () => {
     { name: 'Abonnements', href: '/admin/subscriptions', icon: CreditCard },
     { name: 'Activité', href: '/admin/activity', icon: Activity },
     { name: 'Analytiques', href: '/admin/analytics', icon: BarChart2 },
+    { name: 'Appels d\'offres', href: '/admin/tenders', icon: FileText },
+    { name: 'Packs', href: '/admin/packs', icon: Package },
     { name: 'Paramètres', href: '/admin/settings', icon: Settings },
     { name: 'Profil', href: '/admin/profile', icon: User },
   ];
@@ -93,8 +101,12 @@ const AdminDashboard: React.FC = () => {
                   <Route path="subscriptions" element={<SubscriptionManagement />} />
                   <Route path="activity" element={<ActivityMonitoring />} />
                   <Route path="analytics" element={<Analytics />} />
+                  <Route path="tenders" element={<TenderManagement />} />
+                  <Route path="packs" element={<PackManagement />} />
                   <Route path="settings" element={<AppSettings />} />
                   <Route path="profile" element={<Profile />} />
+                  <Route path="tenders/create" element={<CreateTender />} />
+                  <Route path="tenders/:id" element={<TenderDetail />} />
                 </Routes>
               </div>
             </div>
