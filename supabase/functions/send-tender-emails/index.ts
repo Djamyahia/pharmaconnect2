@@ -61,9 +61,7 @@ serve(async (req) => {
     if (wholesalersError) throw wholesalersError
 
     // Filter wholesalers by delivery wilaya
-    const eligibleWholesalers = wholesalers.filter(w => 
-      w.delivery_wilayas && w.delivery_wilayas.includes(tender.wilaya)
-    )
+    const eligibleWholesalers = wholesalers;
     
 
 
