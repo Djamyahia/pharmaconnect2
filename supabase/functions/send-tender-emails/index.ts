@@ -136,26 +136,32 @@ serve(async (req) => {
       `
     }
 
-    // Send emails to all eligible wholesalers
-    const emailPromises = eligibleWholesalers.map(async (wholesaler) => {
-      const emailContent = generateEmailContent(wholesaler.company_name)
-      
-      return fetch(`${supabaseUrl}/functions/v1/send-email-fixed`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${supabaseServiceKey}`,
-        },
-        body: JSON.stringify({
-          to: wholesaler.email,
-          subject: `Nouvel appel d'offres: ${tender.title}`,
-          content: emailContent
-        }),
-      })
-    })
-
-    // Wait for all emails to be sent
-    await Promise.all(emailPromises)
+    // → Envoi des emails UN PAR UN pour éviter la surcharge concurrente
+    for (const wholesaler of eligibleWholesalers) {
+      try {
+        const emailContent = generateEmailContent(wholesaler.company_name)
+        const res = await fetch(`${supabaseUrl}/functions/v1/send-email-fixed`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabaseServiceKey}`,
+          },
+          body: JSON.stringify({
+            to: wholesaler.email,
+            subject: `Nouvel appel d'offres: ${tender.title}`,
+            content: emailContent,
+          }),
+        })
+        if (!res.ok) {
+          const err = await res.text()
+          console.error(`Échec envoi à ${wholesaler.email}:`, err)
+        } else {
+          console.log(`Email envoyé à ${wholesaler.email}`)
+        }
+      } catch (err) {
+        console.error(`Erreur fatale pour ${wholesaler.email}:`, err)
+      }
+    }
 
     return new Response(
       JSON.stringify({ 
